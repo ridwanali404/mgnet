@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Auth;
+
+class Admin
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @return mixed
+     */
+    public function handle($request, Closure $next)
+    {
+        if (!in_array(Auth::user()->type, ['admin', 'cradmin'])){
+            session(['fail' => 'Only admin, user not allowed.']);
+            return redirect('/');
+        }
+        return $next($request);
+    }
+}

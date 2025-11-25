@@ -1,0 +1,10 @@
+@extends('marketplace.layouts.admin')
+@section('title')
+Dashboard
+@endsection
+@section('style')
+@endsection
+@section('content')
+@endsection
+@section('script')
+@endsection

@@ -1,0 +1,245 @@
+@extends('marketplace.layouts.admin')
+@section('title')
+Banner
+@endsection
+@section('style')
+<!-- FooTable -->
+<link href="{{ asset('inspinia/css/plugins/footable/footable.core.css') }}" rel="stylesheet">
+<link href="{{ asset('bootstrap-imageupload/dist/css/bootstrap-imageupload.min.css') }}" rel="stylesheet">
+<style>
+	a {
+		outline: none !important;
+	}
+</style>
+@endsection
+@section('content')
+<div class="ibox">
+	<div class="ibox-title">
+		<h5>Banner</h5>
+		<div class="ibox-tools">
+			<a href="#" data-toggle="modal" data-target="#add">
+				<i class="fa fa-plus"></i>
+				<span>New Banner</span>
+			</a>
+		</div>
+	</div>
+	<div class="ibox-content">
+		<input type="text" class="form-control input-sm m-b-xs" id="filter" placeholder="Search in table">
+		<div class="table-responsive">
+			<table class="footable table table-stripped toggle-arrow-tiny" data-page-size="8" data-filter=#filter>
+				<thead>
+					<tr>
+						<th>Number</th>
+						<th>Image</th>
+						<th class="text-right" data-sort-ignore="true">Action</th>
+					</tr>
+				</thead>
+				<tbody>
+					@foreach ($banners as $a)
+					<tr>
+						<td>{{ $a->number }}</td>
+						<td>
+							@if($a->image)
+							<a href="#" type="button" data-toggle="modal" data-target=".image{{$a->id}}">View image</a>
+							<div class="modal inmodal image{{$a->id}}" role="dialog">
+								<div class="modal-dialog modal-lg">
+									<div class="modal-content animated fadeInDown">
+										<div class="modal-header">
+											<button type="button" class="close" data-dismiss="modal"><span
+													aria-hidden="true">&times;</span><span
+													class="sr-only">Close</span></button>
+											<i class="fa fa-picture-o modal-icon"></i>
+										</div>
+										<div class="modal-body">
+											<center>
+												<img src="{{ asset($a->image_path) }}" class="img-thumbnail" />
+											</center>
+										</div>
+										<div class="modal-footer">
+											<button type="button" class="btn btn-danger"
+												data-dismiss="modal">Close</button>
+										</div>
+									</div>
+								</div>
+							</div>
+							@else
+							No image
+							@endif
+						</td>
+						<td>
+							<div class="btn-group pull-right">
+								<button class="btn-white btn btn-xs" data-toggle="modal"
+									data-target="#edit{{ $a->id }}">Edit</button>
+								<button class="btn-white btn btn-xs" data-toggle="modal"
+									data-target="#delete{{ $a->id }}">Delete</button>
+							</div>
+							<div class="modal inmodal" id="edit{{ $a->id }}" tabindex="-1" role="dialog"
+								aria-hidden="true">
+								<div class="modal-dialog">
+									<div class="modal-content animated fadeInDown">
+										<form action="{{ url('a/banner/'.$a->id) }}" method="POST"
+											enctype="multipart/form-data">
+											@csrf
+											{{ method_field('PUT') }}
+											<div class="modal-header">
+												<button type="button" class="close" data-dismiss="modal"><span
+														aria-hidden="true">&times;</span><span
+														class="sr-only">Close</span></button>
+												<i class="fa fa-pencil modal-icon"></i>
+											</div>
+											<div class="modal-body">
+												<div class="form-group"><label>Number</label> <input type="number"
+														name="number" value="{{ $a->number }}" min="1" max="10"
+														class="form-control" required><span
+														class="help-block m-b-none">This number belongs to the banner
+														sequence that appears on the main page. Fill with numbering
+														1-10.</span></div>
+												<div class="imageupload panel panel-default">
+													<div class="panel-heading clearfix">
+														<h3 class="panel-title pull-left">Banner Image</h3>
+														<div class="btn-group pull-right">
+															<button type="button"
+																class="btn btn-default active">File</button>
+															<button type="button" class="btn btn-default">URL</button>
+														</div>
+													</div>
+													<div class="file-tab panel-body">
+														<label class="btn btn-default btn-file">
+															<span>Browse</span>
+															<!-- The file is stored here. -->
+															<input type="file" name="image">
+														</label>
+														<button type="button" class="btn btn-default">Remove</button>
+													</div>
+													<div class="url-tab panel-body">
+														<div class="input-group">
+															<input type="text" class="form-control"
+																placeholder="Image URL">
+															<div class="input-group-btn">
+																<button type="button"
+																	class="btn btn-default">Submit</button>
+															</div>
+														</div>
+														<button type="button" class="btn btn-default">Remove</button>
+														<!-- The URL is stored here. -->
+														<input type="hidden" name="image-url">
+													</div>
+												</div>
+											</div>
+											<div class="modal-footer">
+												<button type="submit" class="btn btn-primary">Save changes</button>
+											</div>
+										</form>
+									</div>
+								</div>
+							</div>
+							<div class="modal inmodal" id="delete{{ $a->id }}" tabindex="-1" role="dialog"
+								aria-hidden="true">
+								<div class="modal-dialog">
+									<div class="modal-content animated fadeInDown">
+										<form action="{{ url('a/banner/'.$a->id) }}" method="POST">
+											@csrf
+											{{ method_field('DELETE') }}
+											<div class="modal-header">
+												<button type="button" class="close" data-dismiss="modal"><span
+														aria-hidden="true">&times;</span><span
+														class="sr-only">Close</span></button>
+												<i class="fa fa-trash modal-icon"></i>
+											</div>
+											<div class="modal-body">
+												Are you sure want to delete this data?
+											</div>
+											<div class="modal-footer">
+												<button type="submit" class="btn btn-danger">Delete</button>
+											</div>
+										</form>
+									</div>
+								</div>
+							</div>
+						</td>
+					</tr>
+					@endforeach
+				</tbody>
+				<tfoot>
+					<tr>
+						<td colspan="5">
+							<ul class="pagination pull-right"></ul>
+						</td>
+					</tr>
+				</tfoot>
+			</table>
+		</div>
+	</div>
+</div>
+<div class="modal inmodal" id="add" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content animated fadeInDown">
+			<form action="{{ url('a/banner') }}" method="POST" enctype="multipart/form-data"
+				onsubmit="add.disabled = true;">
+				@csrf
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal">
+						<span aria-hidden="true">&times;</span>
+						<span class="sr-only">Close</span>
+					</button>
+					<i class="fa fa-pencil modal-icon"></i>
+				</div>
+				<div class="modal-body">
+					<div class="form-group">
+						<label>Number</label>
+						<input type="number" name="number" value="{{ old('number') }}" min="1" max="10"
+							class="form-control" required>
+						<span class="help-block m-b-none">This number belongs to the banner sequence that appears on the
+							main page. Fill with numbering 1-10.</span>
+					</div>
+					<div class="imageupload panel panel-default">
+						<div class="panel-heading clearfix">
+							<h3 class="panel-title pull-left">Banner Image</h3>
+							<div class="btn-group pull-right">
+								<button type="button" class="btn btn-default active">File</button>
+								<button type="button" class="btn btn-default">URL</button>
+							</div>
+						</div>
+						<div class="file-tab panel-body">
+							<label class="btn btn-default btn-file">
+								<span>Browse</span>
+								<!-- The file is stored here. -->
+								<input type="file" name="image">
+							</label>
+							<button type="button" class="btn btn-default">Remove</button>
+						</div>
+						<div class="url-tab panel-body">
+							<div class="input-group">
+								<input type="text" class="form-control" placeholder="Image URL">
+								<div class="input-group-btn">
+									<button type="button" class="btn btn-default">Submit</button>
+								</div>
+							</div>
+							<button type="button" class="btn btn-default">Remove</button>
+							<!-- The URL is stored here. -->
+							<input type="hidden" name="image_url">
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="submit" name="add" class="btn btn-primary">Save</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+@endsection
+@section('script')
+<script src="{{ asset('bootstrap-imageupload/dist/js/bootstrap-imageupload.min.js') }}"></script>
+<!-- FooTable -->
+<script src="{{ asset('inspinia/js/plugins/footable/footable.all.min.js') }}"></script>
+<script type="text/javascript">
+	$(document).ready(function() {
+		$('.footable').footable();
+		$('.footable2').footable();
+		$('.imageupload').imageupload({
+			maxFileSizeKb: 1024
+		});
+    });
+</script>
+@endsection
