@@ -28,7 +28,7 @@ class UserImport implements ToModel, WithStartRow
         $bank_id = $bank->id ?? null;
 
         // sponsor_id
-        $sponsor = \App\User::where('image', $row[2])->first();
+        $sponsor = \App\Models\User::where('image', $row[2])->first();
         $sponsor_id = $sponsor->id ?? null;
 
         $user = new User([

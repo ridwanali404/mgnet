@@ -1,14 +1,53 @@
 <?php
 
-use Faker\Generator as Faker;
-use Illuminate\Http\UploadedFile;
+namespace Database\Factories;
 
-$factory->define(App\Gallery::class, function (Faker $faker) {
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $photoFile = new UploadedFile(public_path('img/sample_images/p'.$faker->numberBetween($min = 1, $max = 8).'.jpg'), 'user.png', $finfo->file(public_path('img/sample_images/p'.$faker->numberBetween($min = 1, $max = 8).'.jpg')), File::size(public_path('img/sample_images/p'.$faker->numberBetween($min = 1, $max = 8).'.jpg')), 0, false);
-    $path = Storage::disk('public')->putFile('upload/gallery', $photoFile);
-    return [
-        'name' => 'Gallery '.$faker->numberBetween($min = 1000, $max = 9999),
-        'image' => 'storage/'.$path
-    ];
-});
+use App\Models\Gallery;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Gallery>
+ */
+class GalleryFactory extends Factory
+{
+    /**
+     * The name of the factory's corresponding model.
+     *
+     * @var string
+     */
+    protected $model = Gallery::class;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $imageNumber = fake()->numberBetween(1, 8);
+        $imagePath = public_path('img/sample_images/p' . $imageNumber . '.jpg');
+        
+        if (file_exists($imagePath)) {
+            $photoFile = new UploadedFile(
+                $imagePath,
+                'user.png',
+                $finfo->file($imagePath),
+                filesize($imagePath),
+                0,
+                false
+            );
+            $path = Storage::disk('public')->putFile('upload/gallery', $photoFile);
+            $image = 'storage/' . $path;
+        } else {
+            $image = null;
+        }
+
+        return [
+            'name' => 'Gallery ' . fake()->numberBetween(1000, 9999),
+            'image' => $image,
+        ];
+    }
+}

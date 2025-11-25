@@ -3,14 +3,16 @@
 use Illuminate\Database\Seeder;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
-use App\Province;
-use App\City;
-use App\Subdistrict;
-use App\Bank;
-use App\KeyValue;
-use App\User;
-use App\Product;
-use App\Pin;
+use App\Models\Province;
+use App\Models\City;
+use App\Models\Subdistrict;
+use App\Models\Bank;
+use App\Models\KeyValue;
+use App\Models\User;
+use App\Models\Product;
+use App\Models\Pin;
+use App\Models\Blog;
+use App\Models\Gallery;
 use Intervention\Image\Facades\Image;
 use Illuminate\Support\Str;
 
@@ -25,12 +27,12 @@ class DatabaseSeeder extends Seeder
     {
         // $this->call(UserSeeder::class);
         DB::statement("SET foreign_key_checks=0");
-        App\Customize::truncate();
-        App\Gallery::truncate();
-        App\Blog::truncate();
-        App\Banner::truncate();
-        App\AboutUs::truncate();
-        App\ContactUs::truncate();
+        \App\Models\Customize::truncate();
+        Gallery::truncate();
+        Blog::truncate();
+        \App\Models\Banner::truncate();
+        \App\Models\AboutUs::truncate();
+        \App\Models\ContactUs::truncate();
 
         Pin::truncate();
         Product::truncate();
@@ -176,7 +178,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $admin->userPin()->create([
-            'pin_id' => \App\Pin::where('name', 'Free Member')->value('id'),
+            'pin_id' => Pin::where('name', 'Free Member')->value('id'),
             'name' => 'Free Member',
             'code' => strtoupper(str_random(6)),
             'price' => 0,
@@ -326,7 +328,7 @@ class DatabaseSeeder extends Seeder
         // customize
         $photoFile = new UploadedFile(public_path('images/mpc.png'), 'mpc.png', $finfo->file(public_path('images/mpc.png')), File::size(public_path('images/mpc.png')), 0, false);
         $path = Storage::disk('public')->putFile('upload/customize', $photoFile);
-        $customize = App\Customize::create(array(
+        $customize = \App\Models\Customize::create(array(
             'title' => 'Camp Reseller',
             'meta_description' => 'PT Bisnis Sukses Mulia',
             'meta_keywords' => 'skin care, jual beli',
@@ -339,13 +341,13 @@ class DatabaseSeeder extends Seeder
         // banner
         $photoFile = new UploadedFile(public_path('img/banner/header_one.jpg'), 'user.png', $finfo->file(public_path('img/banner/header_one.jpg')), File::size(public_path('img/banner/header_one.jpg')), 0, false);
         $path = Storage::disk('public')->putFile('upload/banner', $photoFile);
-        $b1 = App\Banner::create(array(
+        $b1 = \App\Models\Banner::create(array(
             'number' => 1,
             'image' => 'storage/'.$path
         ));
         $photoFile = new UploadedFile(public_path('img/banner/header_two.jpg'), 'user.png', $finfo->file(public_path('img/banner/header_two.jpg')), File::size(public_path('img/banner/header_two.jpg')), 0, false);
         $path = Storage::disk('public')->putFile('upload/banner', $photoFile);
-        $b2 = App\Banner::create(array(
+        $b2 = \App\Models\Banner::create(array(
             'number' => 2,
             'image' => 'storage/'.$path
         ));
@@ -353,7 +355,7 @@ class DatabaseSeeder extends Seeder
         // about us
         $photoFile = new UploadedFile(public_path('img/about_us/dashboard.png'), 'user.png', $finfo->file(public_path('img/about_us/dashboard.png')), File::size(public_path('img/about_us/dashboard.png')), 0, false);
         $path = Storage::disk('public')->putFile('upload/about_us', $photoFile);
-        $about_us = App\AboutUs::create(array(
+        $about_us = \App\Models\AboutUs::create(array(
             'title' => 'Camp Reseller',
             'sub_title' => 'PT Bisnis Sukses Mulia',
             'text' => 'Menjadi perusahaan network marketing modern terbesar di Indonesia yang siap mendukung juga mengembangkan produk UMKM , dan produk kebutuhan sehari-hari dengan mengedepankan teknologi digital terkini.',
@@ -362,7 +364,7 @@ class DatabaseSeeder extends Seeder
         ));
 
         // contact us
-        $contact_us = App\ContactUs::create(array(
+        $contact_us = \App\Models\ContactUs::create(array(
             'company' => 'PT Bisnis Sukses Mulia',
             'address_line_1' => 'Jl. Batusari No. 37a',
             'address_line_2' => 'Sanur, Denpasar Selatan, Bali 80228',

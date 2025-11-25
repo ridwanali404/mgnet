@@ -1,15 +1,54 @@
 <?php
 
-use Faker\Generator as Faker;
-use Illuminate\Http\UploadedFile;
+namespace Database\Factories;
 
-$factory->define(App\Blog::class, function (Faker $faker) {
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $photoFile = new UploadedFile(public_path('img/sample_images/p'.$faker->numberBetween($min = 1, $max = 8).'.jpg'), 'user.png', $finfo->file(public_path('img/sample_images/p'.$faker->numberBetween($min = 1, $max = 8).'.jpg')), File::size(public_path('img/sample_images/p'.$faker->numberBetween($min = 1, $max = 8).'.jpg')), 0, false);
-    $path = Storage::disk('public')->putFile('upload/blog', $photoFile);
-    return [
-        'title' => $faker->words($nb = 3, $asText = true),
-        'image' => 'storage/'.$path,
-        'content' => $faker->paragraphs($nb = 20, $asText = true)
-    ];
-});
+use App\Models\Blog;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Blog>
+ */
+class BlogFactory extends Factory
+{
+    /**
+     * The name of the factory's corresponding model.
+     *
+     * @var string
+     */
+    protected $model = Blog::class;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $imageNumber = fake()->numberBetween(1, 8);
+        $imagePath = public_path('img/sample_images/p' . $imageNumber . '.jpg');
+        
+        if (file_exists($imagePath)) {
+            $photoFile = new UploadedFile(
+                $imagePath,
+                'user.png',
+                $finfo->file($imagePath),
+                filesize($imagePath),
+                0,
+                false
+            );
+            $path = Storage::disk('public')->putFile('upload/blog', $photoFile);
+            $image = 'storage/' . $path;
+        } else {
+            $image = null;
+        }
+
+        return [
+            'title' => fake()->words(3, true),
+            'image' => $image,
+            'content' => fake()->paragraphs(20, true),
+        ];
+    }
+}
