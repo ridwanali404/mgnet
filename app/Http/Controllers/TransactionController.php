@@ -15,6 +15,7 @@ use App\Models\OfficialTransaction;
 use App\Models\Address;
 use DateTime;
 use Carbon\Carbon;
+use App\Traits\Helper;
 
 class TransactionController extends Controller
 {
@@ -332,6 +333,11 @@ class TransactionController extends Controller
                     'amount' => $transaction->cashback,
                     'description' => 'Komisi Penjualan dari belanja '.$username.' dengan rincian belanja '.$carts.'.',
                 ]);
+            }
+            
+            // Cek dan perpanjang masa aktif jika belanja RO >= 1.7 juta (dalam masa aktif)
+            if ($user && $transaction->type == 'general') {
+                Helper::checkAndExtendActiveFromRO($user, $transaction->price);
             }
         }
         // add official_transaction_stockists stocks

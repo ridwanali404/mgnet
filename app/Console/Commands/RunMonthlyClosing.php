@@ -65,6 +65,15 @@ class RunMonthlyClosing extends Command
             $this->error("Error pada Profit Sharing payout: " . $e->getMessage());
         }
 
+        // Run Power Plus 8% calculation (bulanan)
+        $this->info("Menjalankan perhitungan Bonus Power Plus 8%...");
+        try {
+            Helper::calculatePowerPlus($month);
+            $this->info("✓ Bonus Power Plus 8% berhasil dihitung");
+        } catch (\Exception $e) {
+            $this->error("Error pada Power Plus calculation: " . $e->getMessage());
+        }
+
         // Summary
         $this->newLine();
         $this->info("==========================================");

@@ -75,6 +75,7 @@
                                 <th>Nama</th>
                                 <th class="text-right">Referral</th>
                                 <th class="text-center">Pin</th>
+                                <th class="text-center">Masa Aktif</th>
                                 <th class="text-right">Aksi</th>
                             </tr>
                         </thead>
@@ -93,6 +94,22 @@
                                 }
                             @endphp
                             @foreach ($users as $a)
+                                @php
+                                    $activeUntil = $a->active_until;
+                                    $isActive = $a->is_active;
+                                    $daysLeft = null;
+                                    
+                                    if ($activeUntil && $isActive) {
+                                        $now = \Carbon\Carbon::now();
+                                        $activeDate = \Carbon\Carbon::parse($activeUntil);
+                                        $daysLeft = floor($now->diffInDays($activeDate, false));
+                                        
+                                        // Hanya tampilkan jika masih aktif (daysLeft > 0)
+                                        if ($daysLeft <= 0) {
+                                            $daysLeft = null;
+                                        }
+                                    }
+                                @endphp
                                 <tr>
                                     <td>{{ $loop->index + 1 }}</td>
                                     <td><code>{{ $a->created_at }}</code></td>
@@ -104,6 +121,13 @@
                                         <code>{{ number_format($a->sponsors()->count()) }}</code>
                                     </td>
                                     <td class="text-center"><code>{{ $a->userPin->pin->name_short ?? '' }}</code></td>
+                                    <td class="text-center">
+                                        @if ($daysLeft !== null && $daysLeft > 0)
+                                            <code>{{ $daysLeft }} hari</code>
+                                        @else
+                                            <code>-</code>
+                                        @endif
+                                    </td>
                                     <td class="text-right">
                                         <a class="btn btn-xs btn-danger btn-rounded"
                                             href="{{ url('referral') . '?username=' . $a->username }}">
@@ -133,7 +157,7 @@
                     ["{{ request()->get('query') ? '2' : '1' }}", "asc"]
                 ],
                 "columnDefs": [{
-                    "targets": [0, 6],
+                    "targets": [0, 7],
                     "orderable": false
                 }]
             });

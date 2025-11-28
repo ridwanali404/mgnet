@@ -158,6 +158,8 @@ class DatabaseSeeder extends Seeder
             'powerplus_percent' => 8,
             'is_generasi' => true,
             'level' => 1,
+            'active_days' => 45, // Masa aktif 45 hari untuk Gold
+            'ro_price' => 1700000, // Harga RO 1.7 juta untuk Gold
         ]);
 
         // Paket Platinum: Rp 15.000.000, 1500 POIN
@@ -176,6 +178,8 @@ class DatabaseSeeder extends Seeder
             'powerplus_percent' => 8,
             'is_generasi' => true,
             'level' => 2,
+            'active_days' => 90, // Masa aktif 90 hari untuk Platinum
+            'ro_price' => 12750000, // Harga RO 12.75 juta untuk Platinum
         ]);
 
         $admin = User::create([

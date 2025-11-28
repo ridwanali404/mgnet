@@ -26,7 +26,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        // Bonus harian - Pair bonus
         $schedule->call(function () {
             ini_set('max_execution_time', '-1');
             ini_set('memory_limit', '-1');
@@ -35,6 +35,22 @@ class Kernel extends ConsoleKernel
             // Log::info('Pair bonus generated: ' . date('Y-m-d'));
         })->dailyAt('23:00');
         // })->everyMinute();
+
+        // Bonus harian - Profit Sharing (dihitung harian jika sudah Qualified)
+        $schedule->call(function () {
+            ini_set('max_execution_time', '-1');
+            ini_set('memory_limit', '-1');
+            Helper::calculateProfitSharing(date('Y-m-d'));
+            Log::info('Profit Sharing calculated: ' . date('Y-m-d'));
+        })->dailyAt('23:30');
+
+        // Bonus harian - Uang Trip (dihitung harian jika sudah Qualified, masuk tabel klaim)
+        $schedule->call(function () {
+            ini_set('max_execution_time', '-1');
+            ini_set('memory_limit', '-1');
+            Helper::calculateUmrohTrip(date('Y-m-d'));
+            Log::info('Umroh Trip calculated: ' . date('Y-m-d'));
+        })->dailyAt('23:45');
 
         // Backups (to Google Drive)
         $schedule->command('backup:clean')->dailyAt('01:30');

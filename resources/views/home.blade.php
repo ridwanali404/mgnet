@@ -105,6 +105,58 @@
                     </div>
                 </div>
             @endif
+            <div class="col-lg-12 col-md-12">
+                <div class="card card-inverse card-cr">
+                    <div class="card-body">
+                        <div class="d-flex">
+                            <div class="m-r-20 align-self-center">
+                                <h1 class="text-white"><i class="mdi mdi-calendar-clock"></i></h1>
+                            </div>
+                            <div style="width: calc(100% - (20px + 36px));">
+                                <h3 class="card-title text-truncate">Masa Aktif</h3>
+                                <h6 class="card-subtitle text-truncate">Status Keanggotaan Aktif</h6>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 align-self-center">
+                                @php
+                                    $user = Auth::user();
+                                    $activeUntil = $user->active_until;
+                                    $isActive = $user->is_active;
+                                @endphp
+                                @if ($activeUntil)
+                                    @php
+                                        $now = \Carbon\Carbon::now();
+                                        $activeDate = \Carbon\Carbon::parse($activeUntil);
+                                        $daysLeft = $now->diffInDays($activeDate, false);
+                                    @endphp
+                                    <h2 class="font-light text-white text-truncate">
+                                        @if ($isActive && $daysLeft > 0)
+                                            <span class="label label-success">Aktif</span>
+                                            <br>
+                                            <small class="text-white-50">Sampai: {{ $activeDate->format('d M Y') }}</small>
+                                            <br>
+                                            <small class="text-white-50">{{ $daysLeft }} hari tersisa</small>
+                                        @elseif ($isActive && $daysLeft <= 0)
+                                            <span class="label label-warning">Hari Terakhir</span>
+                                            <br>
+                                            <small class="text-white-50">Berakhir: {{ $activeDate->format('d M Y') }}</small>
+                                        @else
+                                            <span class="label label-danger">Tidak Aktif</span>
+                                            <br>
+                                            <small class="text-white-50">Berakhir: {{ $activeDate->format('d M Y') }}</small>
+                                        @endif
+                                    </h2>
+                                @else
+                                    <h2 class="font-light text-white text-truncate">
+                                        <span class="label label-default">Belum Terdaftar</span>
+                                    </h2>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="row">
             <div class="col-lg-5 col-md-5">

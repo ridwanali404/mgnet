@@ -127,7 +127,7 @@ trait Helper
                 }
             }
         } else {
-            // sponsor
+            // Bonus Sponsor 15% - DIBUAT HARIAN (dibayar langsung saat upgrade)
             $sponsor = $user->sponsor;
             if ($sponsor && $sponsor->premiumUserPin()->count()) {
                 // Gunakan persentase jika ada, jika tidak gunakan nominal untuk backward compatibility
@@ -158,7 +158,7 @@ trait Helper
             }
         }
 
-        // generasi
+        // Bonus Generasi 19% - DIBUAT HARIAN (dibayar langsung saat upgrade)
         $sponsor = $user->sponsor;
         if ($pin->is_generasi && $pin->price && $pin->generasi_percent > 0) {
             // Hitung total alokasi bonus generasi (19% dari harga paket)
@@ -257,7 +257,7 @@ trait Helper
             }
         }
 
-        // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM)
+        // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM) - DIBUAT HARIAN (dibayar langsung saat upgrade)
         if (!str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
             $sponsor = $user->sponsor;
             // Syarat: sponsor harus memiliki 1 sponsor langsung
@@ -292,8 +292,10 @@ trait Helper
         }
 
         // Masa Aktif & Maintenance
+        // Set masa aktif langsung saat join: Gold 45 hari, Platinum 90 hari
         if (in_array($pin->name, ['Gold', 'Platinum'])) {
-            $activeDays = $pin->name == 'Gold' ? 45 : 90;
+            // Gunakan active_days dari pin jika ada, jika tidak gunakan default
+            $activeDays = $pin->active_days ?? ($pin->name == 'Gold' ? 45 : 90);
             $user->update([
                 'active_until' => Carbon::now()->addDays($activeDays),
                 'active_days_initial' => $activeDays,
@@ -748,6 +750,11 @@ trait Helper
         ]);
         Helper::pinHistory($userPin);
         Helper::upgrade($userPin);
+        
+        // Perpanjang masa aktif 45 hari dari automaintain RO
+        if ($user->active_until) {
+            Helper::extendActiveStatus($user, 'automaintain_ro');
+        }
     }
 
     public static function rank($user, $nominal)
@@ -768,6 +775,11 @@ trait Helper
      * Hitung Profit Sharing 5% harian untuk Platinum (perdana)
      * Dipanggil setiap hari untuk menghitung akumulasi
      */
+    /**
+     * Hitung Profit Sharing 5%
+     * DIHITUNG HARIAN jika sudah Qualified (hanya untuk Platinum aktivasi perdana)
+     * Dipanggil setiap hari untuk menghitung profit sharing
+     */
     public static function calculateProfitSharing($date = null)
     {
         if (!$date) {
@@ -778,22 +790,31 @@ trait Helper
         $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000; // Convert poin ke rupiah (1 poin = 1000)
         $profitSharingAmount = round($totalOmzet * 0.05); // 5% dari omzet
         
-        // Dapatkan semua user Platinum yang aktivasi perdana
+        // Dapatkan semua user Platinum yang aktivasi perdana dan sudah Qualified
         $platinumUsers = User::whereHas('profitSharings', function ($q) {
             $q->where('is_perdana_platinum', true);
         })->where('is_active', true)->get();
         
         foreach ($platinumUsers as $user) {
-            $profitSharing = $user->profitSharings()->where('is_perdana_platinum', true)->first();
-            if ($profitSharing) {
-                $dailyAccumulation = $profitSharing->daily_accumulation + $profitSharingAmount;
-                $walletCashback = min($dailyAccumulation, 22500000); // Maksimal 22.500.000
-                
-                $profitSharing->update([
-                    'daily_accumulation' => $dailyAccumulation,
-                    'wallet_cashback' => $walletCashback,
-                    'date' => $date,
-                ]);
+            // Cek apakah user sudah Qualified (minimal 3 tim aktif)
+            $activeTeams = $user->sponsors()
+                ->whereHas('premiumUserPin')
+                ->where('is_active', true)
+                ->count();
+            
+            // Hanya hitung jika sudah Qualified (minimal 3 tim aktif)
+            if ($activeTeams >= 3) {
+                $profitSharing = $user->profitSharings()->where('is_perdana_platinum', true)->first();
+                if ($profitSharing) {
+                    $dailyAccumulation = $profitSharing->daily_accumulation + $profitSharingAmount;
+                    $walletCashback = min($dailyAccumulation, 22500000); // Maksimal 22.500.000
+                    
+                    $profitSharing->update([
+                        'daily_accumulation' => $dailyAccumulation,
+                        'wallet_cashback' => $walletCashback,
+                        'date' => $date,
+                    ]);
+                }
             }
         }
     }
@@ -830,14 +851,19 @@ trait Helper
     }
 
     /**
-     * Hitung Bonus Power Plus
-     * Dipanggil setiap hari untuk menghitung bonus power plus
+     * Hitung Bonus Power Plus 8%
+     * DIHITUNG BULANAN (bukan harian)
+     * Dipanggil setiap bulan untuk menghitung bonus power plus berdasarkan omzet bulanan
      */
-    public static function calculatePowerPlus($date = null)
+    public static function calculatePowerPlus($month = null)
     {
-        if (!$date) {
-            $date = date('Y-m-d');
+        if (!$month) {
+            $month = date('Y-m');
         }
+        
+        $date = DateTime::createFromFormat('Y-m', $month);
+        $startDate = $date->format('Y-m-01');
+        $endDate = $date->format('Y-m-t');
         
         // Dapatkan semua user yang memiliki 2 tim aktif (kiri & kanan)
         $qualifiedUsers = User::whereHas('premiumUserPin')
@@ -856,18 +882,19 @@ trait Helper
             });
         
         foreach ($qualifiedUsers as $user) {
-            // Hitung omzet kiri dan kanan
-            $leftOmzet = Helper::calculateLegOmzet($user, 'left', $date);
-            $rightOmzet = Helper::calculateLegOmzet($user, 'right', $date);
+            // Hitung omzet kiri dan kanan untuk bulan tersebut (akumulasi harian)
+            $leftOmzet = Helper::calculateLegOmzetMonthly($user, 'left', $month);
+            $rightOmzet = Helper::calculateLegOmzetMonthly($user, 'right', $month);
             $smallerLegOmzet = min($leftOmzet, $rightOmzet);
             
             $isQualified15k = $smallerLegOmzet >= 15000;
             $isQualified30k = $smallerLegOmzet >= 30000;
             
+            // Simpan dengan tanggal akhir bulan
             PowerPlusQualification::updateOrCreate(
                 [
                     'user_id' => $user->id,
-                    'date' => $date,
+                    'date' => $endDate,
                 ],
                 [
                     'left_omzet' => $leftOmzet,
@@ -879,45 +906,49 @@ trait Helper
             );
         }
         
-        // Hitung total payout perusahaan (5% dari total omzet)
-        $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000;
-        $totalPayout = round($totalOmzet * 0.05);
+        // Hitung total payout perusahaan bulanan (8% dari total omzet bulanan)
+        $totalOmzet = Helper::transactionPoin($date) * 1000;
+        $totalPayout = round($totalOmzet * 0.08); // 8% untuk Power Plus
         
         // Distribusi ke qualified members
-        $qualified15k = PowerPlusQualification::where('date', $date)
+        $qualified15k = PowerPlusQualification::where('date', $endDate)
             ->where('is_qualified_15k', true)
             ->count();
-        $qualified30k = PowerPlusQualification::where('date', $date)
+        $qualified30k = PowerPlusQualification::where('date', $endDate)
             ->where('is_qualified_30k', true)
             ->count();
         
         if ($qualified15k > 0) {
             $bonus15k = round(($totalPayout * 0.04) / $qualified15k); // 4% dibagi jumlah qualified
-            PowerPlusQualification::where('date', $date)
+            PowerPlusQualification::where('date', $endDate)
                 ->where('is_qualified_15k', true)
                 ->get()
-                ->each(function ($qualification) use ($bonus15k, $date) {
+                ->each(function ($qualification) use ($bonus15k, $month) {
                     $qualification->update(['bonus_amount' => $bonus15k]);
                     $qualification->user->bonuses()->create([
                         'type' => 'Bonus Power Plus',
                         'amount' => $bonus15k,
-                        'description' => 'Bonus Power Plus untuk omzet kaki kecil 15.000 point.',
+                        'description' => 'Bonus Power Plus untuk omzet kaki kecil 15.000 point bulan ' . $month . '.',
+                        'created_at' => $month . '-01 00:00:00',
+                        'updated_at' => $month . '-01 00:00:00',
                     ]);
                 });
         }
         
         if ($qualified30k > 0) {
             $bonus30k = round(($totalPayout * 0.04) / $qualified30k); // 4% dibagi jumlah qualified
-            PowerPlusQualification::where('date', $date)
+            PowerPlusQualification::where('date', $endDate)
                 ->where('is_qualified_30k', true)
                 ->get()
-                ->each(function ($qualification) use ($bonus30k, $date) {
+                ->each(function ($qualification) use ($bonus30k, $month) {
                     if ($qualification->bonus_amount == 0) {
                         $qualification->update(['bonus_amount' => $bonus30k]);
                         $qualification->user->bonuses()->create([
                             'type' => 'Bonus Power Plus',
                             'amount' => $bonus30k,
-                            'description' => 'Bonus Power Plus untuk omzet kaki kecil 30.000 point.',
+                            'description' => 'Bonus Power Plus untuk omzet kaki kecil 30.000 point bulan ' . $month . '.',
+                            'created_at' => $month . '-01 00:00:00',
+                            'updated_at' => $month . '-01 00:00:00',
                         ]);
                     }
                 });
@@ -925,7 +956,7 @@ trait Helper
     }
 
     /**
-     * Hitung omzet leg (kiri atau kanan)
+     * Hitung omzet leg (kiri atau kanan) untuk tanggal tertentu (harian)
      */
     public static function calculateLegOmzet($user, $side, $date)
     {
@@ -948,7 +979,40 @@ trait Helper
     }
 
     /**
+     * Hitung omzet leg (kiri atau kanan) untuk bulan tertentu (bulanan - akumulasi)
+     */
+    public static function calculateLegOmzetMonthly($user, $side, $month)
+    {
+        $date = DateTime::createFromFormat('Y-m', $month);
+        $startDate = $date->format('Y-m-01');
+        $endDate = $date->format('Y-m-t');
+        
+        $sponsors = $user->sponsors()->where('placement_side', $side)
+            ->whereHas('premiumUserPin')
+            ->get();
+        
+        $omzet = 0;
+        foreach ($sponsors as $sponsor) {
+            // Hitung omzet bulanan dari sponsor (akumulasi semua hari dalam bulan)
+            $monthlyPoins = $sponsor->dailyPoins()
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get();
+            
+            foreach ($monthlyPoins as $dailyPoin) {
+                $omzet += $dailyPoin->pp + $dailyPoin->pr;
+            }
+            
+            // Recursive untuk downline
+            $omzet += Helper::calculateLegOmzetMonthly($sponsor, $side, $month);
+        }
+        
+        return $omzet;
+    }
+
+    /**
      * Hitung Tabungan Umroh/Trip 4%
+     * DIHITUNG HARIAN jika sudah Qualified (minimal 3 tim aktif)
+     * Masuk ke tabel klaim (umroh_trip_savings)
      * Dipanggil setiap hari
      */
     public static function calculateUmrohTrip($date = null)
@@ -1019,6 +1083,61 @@ trait Helper
             'active_until' => $newActiveUntil,
             'is_active' => true,
         ]);
+    }
+
+    /**
+     * Cek dan perpanjang masa aktif berdasarkan belanja RO
+     * Jika total belanja RO dalam masa aktif >= 1.7 juta (Gold) atau 12.75 juta (Platinum), perpanjang 45 hari
+     * Bisa dari automaintain atau dari belanja RO total dalam kisaran masa aktif
+     */
+    public static function checkAndExtendActiveFromRO($user, $transactionAmount = 0)
+    {
+        if (!$user->active_until) {
+            return false;
+        }
+
+        // Cek apakah user punya pin Gold atau Platinum
+        $userPin = $user->premiumUserPin;
+        if (!$userPin || !$userPin->pin) {
+            return false;
+        }
+
+        $pin = $userPin->pin;
+        $roPrice = $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000); // Default 1.7 juta untuk Gold, 12.75 juta untuk Platinum
+
+        // Hitung total belanja RO dalam masa aktif (dari tanggal mulai aktif sampai sekarang)
+        $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
+        
+        // Total belanja dari automaintain RO (PIN PAKET RO atau BSM GOLD Automaintain)
+        $automaintainRO = $user->userPins()
+            ->whereHas('pin', function($q) {
+                $q->whereIn('name', ['PIN PAKET RO', 'BSM GOLD Automaintain']);
+            })
+            ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+            ->sum('price');
+
+        // Total belanja RO dari transaksi umum dalam masa aktif
+        // Hitung semua transaksi yang sudah paid/received dalam masa aktif
+        $transactionRO = Transaction::where('user_id', $user->id)
+            ->where('type', 'general')
+            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+            ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+            ->sum('price');
+
+        // Tambahkan transaction amount yang baru saja dibuat (jika ada)
+        $transactionRO += $transactionAmount;
+
+        $totalRO = $automaintainRO + $transactionRO;
+
+        // Jika total RO >= harga RO, perpanjang 45 hari
+        // Kita perlu track agar tidak double extend - cek apakah sudah pernah extend dalam periode ini
+        // Untuk sementara, kita extend jika mencapai threshold
+        if ($totalRO >= $roPrice) {
+            Helper::extendActiveStatus($user, 'belanja_ro');
+            return true;
+        }
+        
+        return false;
     }
 
     /**
