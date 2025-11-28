@@ -19,6 +19,7 @@ class CreatePinsTable extends Migration
             $table->string('type')->default('free'); // free, premium, upgrade
             $table->bigInteger('price')->default(0);
             $table->bigInteger('bonus_sponsor')->default(0);
+            $table->decimal('bonus_sponsor_percent', 5, 2)->default(0);
             $table->integer('poin_pair')->default(0);
             $table->integer('poin_reward')->default(0);
             $table->integer('poin_ro')->default(0);
@@ -26,6 +27,13 @@ class CreatePinsTable extends Migration
             $table->integer('reward_flush')->default(0);
             $table->integer('level')->default(0);
             $table->bigInteger('bonus_monoleg')->default(0);
+            $table->decimal('monoleg_percent', 5, 2)->default(0);
+            $table->bigInteger('voucher_umroh')->default(0);
+            $table->decimal('profit_sharing_percent', 5, 2)->default(0);
+            $table->bigInteger('profit_sharing_max')->default(0);
+            $table->decimal('trip_umroh_percent', 5, 2)->default(0);
+            $table->decimal('generasi_percent', 5, 2)->default(0);
+            $table->decimal('powerplus_percent', 5, 2)->default(0);
             $table->boolean('is_generasi')->default(false);
             $table->timestamps();
         });

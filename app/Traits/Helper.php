@@ -21,6 +21,9 @@ use App\Models\Transaction;
 use App\Models\MonthlyClosing;
 use App\Models\GlobalDailyPoin;
 use App\Models\OfficialTransaction;
+use App\Models\PowerPlusQualification;
+use App\Models\ProfitSharing;
+use App\Models\UmrohTripSaving;
 use Illuminate\Support\Facades\Mail;
 
 trait Helper
@@ -93,33 +96,54 @@ trait Helper
             }
             // sponsor
             $sponsor = $user->sponsor;
-            $amount = $pin->bonus_sponsor;
-            if ($sponsor && $amount && $sponsor->premiumUserPin()->count()) {
-                $pin_level = $sponsor->userPin->level;
-                if ($pin->level > $pin_level) {
-                    $amount = Pin::where('name', 'like', '%BSM%')
-                        ->where('type', 'premium')
-                        ->where('level', $pin_level)
-                        ->value('bonus_sponsor') ?? 0;
+            if ($sponsor && $sponsor->premiumUserPin()->count()) {
+                // Gunakan persentase jika ada, jika tidak gunakan nominal untuk backward compatibility
+                if ($pin->bonus_sponsor_percent > 0) {
+                    $amount = round($pin->price * $pin->bonus_sponsor_percent / 100);
+                } else {
+                    $amount = $pin->bonus_sponsor;
                 }
-                $bonus = $sponsor->bonuses()->create([
-                    'type' => 'Komisi Sponsor',
-                    'amount' => $amount,
-                    'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
-                ]);
-                Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                if ($amount > 0) {
+                    $pin_level = $sponsor->userPin->level;
+                    if ($pin->level > $pin_level) {
+                        $sponsorPin = Pin::where('name', 'like', '%BSM%')
+                            ->where('type', 'premium')
+                            ->where('level', $pin_level)
+                            ->first();
+                        if ($sponsorPin) {
+                            if ($sponsorPin->bonus_sponsor_percent > 0) {
+                                $amount = round($pin->price * $sponsorPin->bonus_sponsor_percent / 100);
+                            } else {
+                                $amount = $sponsorPin->bonus_sponsor ?? 0;
+                            }
+                        }
+                    }
+                    $bonus = $sponsor->bonuses()->create([
+                        'type' => 'Komisi Sponsor',
+                        'amount' => $amount,
+                        'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
+                    ]);
+                    Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                }
             }
         } else {
             // sponsor
             $sponsor = $user->sponsor;
-            $amount = $pin->bonus_sponsor;
-            if ($amount && $sponsor && $sponsor->premiumUserPin()->count()) {
-                $bonus = $sponsor->bonuses()->create([
-                    'type' => 'Komisi Sponsor',
-                    'amount' => $amount,
-                    'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
-                ]);
-                Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+            if ($sponsor && $sponsor->premiumUserPin()->count()) {
+                // Gunakan persentase jika ada, jika tidak gunakan nominal untuk backward compatibility
+                if ($pin->bonus_sponsor_percent > 0) {
+                    $amount = round($pin->price * $pin->bonus_sponsor_percent / 100);
+                } else {
+                    $amount = $pin->bonus_sponsor;
+                }
+                if ($amount > 0) {
+                    $bonus = $sponsor->bonuses()->create([
+                        'type' => 'Komisi Sponsor',
+                        'amount' => $amount,
+                        'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
+                    ]);
+                    Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                }
             }
             if ($pin->name == 'PIN PAKET RO') {
                 $monoleg = $user->monoleg;
@@ -136,22 +160,145 @@ trait Helper
 
         // generasi
         $sponsor = $user->sponsor;
-        if ($pin->is_generasi && $pin->price) {
+        if ($pin->is_generasi && $pin->price && $pin->generasi_percent > 0) {
+            // Hitung total alokasi bonus generasi (19% dari harga paket)
+            $totalAllocation = round($pin->price * $pin->generasi_percent / 100);
+            
+            // Distribusi persentase per generasi: 25%, kemudian turun sampai 3%
+            // Generasi 1: 25%, 2: 20%, 3: 15%, 4: 12%, 5: 10%, 6: 8%, 7: 6%, 8: 5%, 9: 4%, 10: 3%
+            $generasiPercentages = [25, 20, 15, 12, 10, 8, 6, 5, 4, 3];
+            
+            // Track untuk push-up mechanism
+            $generasiStack = []; // Stack untuk menyimpan generasi yang perlu di-push-up
+            
             for ($i = 1; $i <= 10; $i++) {
-                if ($sponsor->generasiUserPin) {
-                    $amount = KeyValue::where('key', 'weekly_unilevel_' . $i)->value('value');
-                    $bonus = $sponsor->bonuses()->create([
-                        'type' => 'Bonus Generasi',
-                        'amount' => $amount,
-                        'description' => 'Bonus Generasi dari upgrade ' . $user->username . '. Generasi ke-' . $i . ' sebesar ' . $amount . '.',
-                    ]);
-                    Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
-                }
-                $sponsor = $sponsor->sponsor;
                 if (!$sponsor) {
                     break;
                 }
+                
+                // Cek apakah sponsor punya pin generasi (Gold atau Platinum)
+                if ($sponsor->premiumUserPin && $sponsor->premiumUserPin->pin) {
+                    $sponsorPin = $sponsor->premiumUserPin->pin;
+                    
+                    // Push-up mechanism: Jika di bawah Gold terdapat Platinum, selisih naik ke upline Platinum
+                    if ($sponsorPin->name == 'Gold' && $pin->name == 'Platinum') {
+                        // Cari upline Platinum terdekat di atas Gold ini
+                        $platinumUpline = Helper::findPlatinumUpline($sponsor);
+                        if ($platinumUpline) {
+                            // Push-up: bonus Platinum diberikan ke upline Platinum, bukan ke Gold
+                            $percent = $generasiPercentages[$i - 1] ?? 0;
+                            $amount = round($totalAllocation * $percent / 100);
+                            
+                            if ($amount > 0) {
+                                $bonus = $platinumUpline->bonuses()->create([
+                                    'type' => 'Bonus Generasi',
+                                    'amount' => $amount,
+                                    'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                ]);
+                                Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                            }
+                            // Skip Gold ini, lanjut ke sponsor berikutnya
+                            $sponsor = $sponsor->sponsor;
+                            continue;
+                        }
+                    }
+                    
+                    // Push-up mechanism: Jika akun tidak aktif 90 hari, push-up ke upline aktif
+                    $isInactive90Days = false;
+                    if (!$sponsor->is_active) {
+                        $isInactive90Days = true;
+                    } elseif ($sponsor->active_until) {
+                        // Cek apakah sudah melewati 90 hari dari active_until
+                        $inactiveDate = Carbon::parse($sponsor->active_until);
+                        if ($inactiveDate->addDays(90)->lt(Carbon::now())) {
+                            $isInactive90Days = true;
+                        }
+                    }
+                    
+                    if ($isInactive90Days) {
+                        // Cari upline aktif terdekat
+                        $activeUpline = Helper::findActiveUpline($sponsor);
+                        if ($activeUpline && $activeUpline->id != $sponsor->id) {
+                            // Push-up ke upline aktif
+                            $percent = $generasiPercentages[$i - 1] ?? 0;
+                            $amount = round($totalAllocation * $percent / 100);
+                            
+                            if ($amount > 0 && $activeUpline->premiumUserPin && in_array($activeUpline->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
+                                $bonus = $activeUpline->bonuses()->create([
+                                    'type' => 'Bonus Generasi',
+                                    'amount' => $amount,
+                                    'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                ]);
+                                Helper::automaintain($activeUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                            }
+                            // Skip sponsor tidak aktif, lanjut ke sponsor berikutnya
+                            $sponsor = $sponsor->sponsor;
+                            continue;
+                        }
+                    }
+                    
+                    // Normal flow: berikan bonus jika sponsor punya Gold atau Platinum
+                    if (in_array($sponsorPin->name, ['Gold', 'Platinum'])) {
+                        $percent = $generasiPercentages[$i - 1] ?? 0;
+                        $amount = round($totalAllocation * $percent / 100);
+                        
+                        if ($amount > 0) {
+                            $bonus = $sponsor->bonuses()->create([
+                                'type' => 'Bonus Generasi',
+                                'amount' => $amount,
+                                'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                            ]);
+                            Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                        }
+                    }
+                }
+                
+                $sponsor = $sponsor->sponsor;
             }
+        }
+
+        // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM)
+        if (!str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
+            $sponsor = $user->sponsor;
+            // Syarat: sponsor harus memiliki 1 sponsor langsung
+            if ($sponsor && $sponsor->sponsors()->whereHas('premiumUserPin')->count() >= 1) {
+                // Cari monoleg (leg kanan) - unlimited depth
+                $monoleg = Helper::findMonolegRecursive($sponsor, $user);
+                if ($monoleg) {
+                    $amount = round($pin->price * $pin->monoleg_percent / 100);
+                    if ($amount > 0) {
+                        $bonus = $monoleg->bonuses()->create([
+                            'type' => 'Bonus Monoleg',
+                            'amount' => $amount,
+                            'description' => 'Bonus Monoleg 9% dari upgrade ' . $user->username . ' paket ' . $pin->name . '.',
+                        ]);
+                        Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                    }
+                }
+            }
+        }
+
+        // Profit Sharing 5% (Khusus Platinum - hanya untuk aktivasi perdana)
+        if ($pin->name == 'Platinum' && $pin->profit_sharing_percent > 0) {
+            // Cek apakah ini aktivasi perdana Platinum
+            $isPerdana = !$user->profitSharings()->where('is_perdana_platinum', true)->exists();
+            if ($isPerdana) {
+                ProfitSharing::create([
+                    'user_id' => $user->id,
+                    'is_perdana_platinum' => true,
+                    'date' => date('Y-m-d'),
+                ]);
+            }
+        }
+
+        // Masa Aktif & Maintenance
+        if (in_array($pin->name, ['Gold', 'Platinum'])) {
+            $activeDays = $pin->name == 'Gold' ? 45 : 90;
+            $user->update([
+                'active_until' => Carbon::now()->addDays($activeDays),
+                'active_days_initial' => $activeDays,
+                'is_active' => true,
+            ]);
         }
 
         // pp pr update
@@ -165,6 +312,87 @@ trait Helper
                 $sponsor = $sponsor->sponsor;
             }
         }
+    }
+
+    /**
+     * Mencari upline Platinum terdekat di atas user tertentu
+     * Digunakan untuk push-up mechanism ketika di bawah Gold ada Platinum
+     */
+    public static function findPlatinumUpline($user)
+    {
+        $sponsor = $user->sponsor;
+        while ($sponsor) {
+            if ($sponsor->premiumUserPin && $sponsor->premiumUserPin->pin) {
+                $sponsorPin = $sponsor->premiumUserPin->pin;
+                if ($sponsorPin->name == 'Platinum') {
+                    return $sponsor;
+                }
+            }
+            $sponsor = $sponsor->sponsor;
+        }
+        return null;
+    }
+
+    /**
+     * Mencari upline aktif terdekat di atas user tertentu
+     * Digunakan untuk push-up mechanism ketika akun tidak aktif 90 hari
+     */
+    public static function findActiveUpline($user)
+    {
+        $sponsor = $user->sponsor;
+        while ($sponsor) {
+            // Cek apakah sponsor punya pin generasi
+            if ($sponsor->premiumUserPin && 
+                $sponsor->premiumUserPin->pin &&
+                in_array($sponsor->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
+                // Cek apakah sponsor aktif
+                $isActive = $sponsor->is_active;
+                if ($sponsor->active_until) {
+                    // Cek apakah tidak melewati 90 hari dari active_until
+                    $inactiveDate = Carbon::parse($sponsor->active_until);
+                    $isActive = $isActive && $inactiveDate->addDays(90)->gte(Carbon::now());
+                }
+                
+                if ($isActive) {
+                    return $sponsor;
+                }
+            }
+            $sponsor = $sponsor->sponsor;
+        }
+        return null;
+    }
+
+    /**
+     * Mencari monoleg (leg kanan) secara recursive untuk bonus monoleg
+     * Leg kanan = sponsor yang ditempatkan di sisi kanan
+     * Bonus monoleg diberikan ke upline yang memiliki leg kanan
+     */
+    public static function findMonolegRecursive($sponsor, $currentUser)
+    {
+        // Cari sponsor langsung yang ditempatkan di kanan
+        $rightLeg = $sponsor->sponsors()->where('placement_side', 'right')
+            ->whereHas('premiumUserPin')
+            ->orderBy('created_at', 'asc')
+            ->first();
+        
+        if ($rightLeg) {
+            // Jika current user adalah di bawah right leg, return sponsor (upline dari right leg)
+            if ($currentUser->sponsor_id == $rightLeg->id) {
+                return $sponsor;
+            }
+            // Jika current user masih di bawah right leg, lanjutkan recursive
+            $found = Helper::findMonolegRecursive($rightLeg, $currentUser);
+            if ($found) {
+                return $found;
+            }
+        }
+        
+        // Jika current user langsung di bawah sponsor dan tidak ada right leg sebelumnya, return sponsor
+        if ($currentUser->sponsor_id == $sponsor->id && $currentUser->placement_side == 'right') {
+            return $sponsor;
+        }
+        
+        return null;
     }
 
     public static function transactionUsers(DateTime $date)
@@ -533,6 +761,283 @@ trait Helper
             $user->userRanks()->firstOrCreate([
                 'rank_id' => $nextRank->id,
             ]);
+        }
+    }
+
+    /**
+     * Hitung Profit Sharing 5% harian untuk Platinum (perdana)
+     * Dipanggil setiap hari untuk menghitung akumulasi
+     */
+    public static function calculateProfitSharing($date = null)
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+        
+        // Hitung total omzet perusahaan hari ini
+        $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000; // Convert poin ke rupiah (1 poin = 1000)
+        $profitSharingAmount = round($totalOmzet * 0.05); // 5% dari omzet
+        
+        // Dapatkan semua user Platinum yang aktivasi perdana
+        $platinumUsers = User::whereHas('profitSharings', function ($q) {
+            $q->where('is_perdana_platinum', true);
+        })->where('is_active', true)->get();
+        
+        foreach ($platinumUsers as $user) {
+            $profitSharing = $user->profitSharings()->where('is_perdana_platinum', true)->first();
+            if ($profitSharing) {
+                $dailyAccumulation = $profitSharing->daily_accumulation + $profitSharingAmount;
+                $walletCashback = min($dailyAccumulation, 22500000); // Maksimal 22.500.000
+                
+                $profitSharing->update([
+                    'daily_accumulation' => $dailyAccumulation,
+                    'wallet_cashback' => $walletCashback,
+                    'date' => $date,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Payout Profit Sharing bulanan
+     * Dipanggil setiap bulan untuk membayar profit sharing
+     */
+    public static function payoutProfitSharing($month)
+    {
+        $date = DateTime::createFromFormat('Y-m', $month);
+        $users = User::whereHas('profitSharings', function ($q) {
+            $q->where('is_perdana_platinum', true);
+        })->where('is_active', true)->get();
+        
+        foreach ($users as $user) {
+            $profitSharing = $user->profitSharings()->where('is_perdana_platinum', true)->first();
+            if ($profitSharing && $profitSharing->wallet_cashback > 0) {
+                $user->bonuses()->create([
+                    'type' => 'Bonus Profit Sharing',
+                    'amount' => $profitSharing->wallet_cashback,
+                    'description' => 'Bonus Profit Sharing 5% untuk bulan ' . $month . '.',
+                    'created_at' => $month . '-01 00:00:00',
+                    'updated_at' => $month . '-01 00:00:00',
+                ]);
+                
+                // Reset wallet cashback setelah payout
+                $profitSharing->update([
+                    'wallet_cashback' => 0,
+                    'monthly_total' => $profitSharing->wallet_cashback,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Hitung Bonus Power Plus
+     * Dipanggil setiap hari untuk menghitung bonus power plus
+     */
+    public static function calculatePowerPlus($date = null)
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+        
+        // Dapatkan semua user yang memiliki 2 tim aktif (kiri & kanan)
+        $qualifiedUsers = User::whereHas('premiumUserPin')
+            ->where('is_active', true)
+            ->get()
+            ->filter(function ($user) {
+                $leftTeam = $user->sponsors()->where('placement_side', 'left')
+                    ->whereHas('premiumUserPin')
+                    ->where('is_active', true)
+                    ->count();
+                $rightTeam = $user->sponsors()->where('placement_side', 'right')
+                    ->whereHas('premiumUserPin')
+                    ->where('is_active', true)
+                    ->count();
+                return $leftTeam >= 1 && $rightTeam >= 1;
+            });
+        
+        foreach ($qualifiedUsers as $user) {
+            // Hitung omzet kiri dan kanan
+            $leftOmzet = Helper::calculateLegOmzet($user, 'left', $date);
+            $rightOmzet = Helper::calculateLegOmzet($user, 'right', $date);
+            $smallerLegOmzet = min($leftOmzet, $rightOmzet);
+            
+            $isQualified15k = $smallerLegOmzet >= 15000;
+            $isQualified30k = $smallerLegOmzet >= 30000;
+            
+            PowerPlusQualification::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'date' => $date,
+                ],
+                [
+                    'left_omzet' => $leftOmzet,
+                    'right_omzet' => $rightOmzet,
+                    'smaller_leg_omzet' => $smallerLegOmzet,
+                    'is_qualified_15k' => $isQualified15k,
+                    'is_qualified_30k' => $isQualified30k,
+                ]
+            );
+        }
+        
+        // Hitung total payout perusahaan (5% dari total omzet)
+        $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000;
+        $totalPayout = round($totalOmzet * 0.05);
+        
+        // Distribusi ke qualified members
+        $qualified15k = PowerPlusQualification::where('date', $date)
+            ->where('is_qualified_15k', true)
+            ->count();
+        $qualified30k = PowerPlusQualification::where('date', $date)
+            ->where('is_qualified_30k', true)
+            ->count();
+        
+        if ($qualified15k > 0) {
+            $bonus15k = round(($totalPayout * 0.04) / $qualified15k); // 4% dibagi jumlah qualified
+            PowerPlusQualification::where('date', $date)
+                ->where('is_qualified_15k', true)
+                ->get()
+                ->each(function ($qualification) use ($bonus15k, $date) {
+                    $qualification->update(['bonus_amount' => $bonus15k]);
+                    $qualification->user->bonuses()->create([
+                        'type' => 'Bonus Power Plus',
+                        'amount' => $bonus15k,
+                        'description' => 'Bonus Power Plus untuk omzet kaki kecil 15.000 point.',
+                    ]);
+                });
+        }
+        
+        if ($qualified30k > 0) {
+            $bonus30k = round(($totalPayout * 0.04) / $qualified30k); // 4% dibagi jumlah qualified
+            PowerPlusQualification::where('date', $date)
+                ->where('is_qualified_30k', true)
+                ->get()
+                ->each(function ($qualification) use ($bonus30k, $date) {
+                    if ($qualification->bonus_amount == 0) {
+                        $qualification->update(['bonus_amount' => $bonus30k]);
+                        $qualification->user->bonuses()->create([
+                            'type' => 'Bonus Power Plus',
+                            'amount' => $bonus30k,
+                            'description' => 'Bonus Power Plus untuk omzet kaki kecil 30.000 point.',
+                        ]);
+                    }
+                });
+        }
+    }
+
+    /**
+     * Hitung omzet leg (kiri atau kanan)
+     */
+    public static function calculateLegOmzet($user, $side, $date)
+    {
+        $sponsors = $user->sponsors()->where('placement_side', $side)
+            ->whereHas('premiumUserPin')
+            ->get();
+        
+        $omzet = 0;
+        foreach ($sponsors as $sponsor) {
+            // Hitung omzet dari sponsor dan downline-nya
+            $dailyPoin = $sponsor->dailyPoins()->where('date', $date)->first();
+            if ($dailyPoin) {
+                $omzet += $dailyPoin->pp + $dailyPoin->pr;
+            }
+            // Recursive untuk downline
+            $omzet += Helper::calculateLegOmzet($sponsor, $side, $date);
+        }
+        
+        return $omzet;
+    }
+
+    /**
+     * Hitung Tabungan Umroh/Trip 4%
+     * Dipanggil setiap hari
+     */
+    public static function calculateUmrohTrip($date = null)
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+        
+        $year = date('Y', strtotime($date));
+        
+        // Hitung 4% dari omzet perusahaan
+        $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000;
+        $umrohAmount = round($totalOmzet * 0.04);
+        
+        // Dapatkan semua user yang memiliki minimal 3 tim aktif
+        $qualifiedUsers = User::whereHas('premiumUserPin', function ($q) {
+            $q->whereHas('pin', function ($qPin) {
+                $qPin->whereIn('name', ['Gold', 'Platinum']);
+            });
+        })
+        ->where('is_active', true)
+        ->get()
+        ->filter(function ($user) {
+            $activeTeams = $user->sponsors()
+                ->whereHas('premiumUserPin')
+                ->where('is_active', true)
+                ->count();
+            return $activeTeams >= 3;
+        });
+        
+        foreach ($qualifiedUsers as $user) {
+            $umrohSaving = UmrohTripSaving::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'year' => $year,
+                ],
+                [
+                    'yearly_accumulation' => 0,
+                    'claimed_amount' => 0,
+                    'active_teams_count' => $user->sponsors()
+                        ->whereHas('premiumUserPin')
+                        ->where('is_active', true)
+                        ->count(),
+                ]
+            );
+            
+            // Tambahkan akumulasi (maksimal 50.000.000 per tahun)
+            $newAccumulation = min($umrohSaving->yearly_accumulation + $umrohAmount, 50000000);
+            $umrohSaving->update([
+                'yearly_accumulation' => $newAccumulation,
+            ]);
+        }
+    }
+
+    /**
+     * Perpanjang masa aktif user
+     * Dipanggil ketika user melakukan repeat order atau sponsor 2 orang baru
+     */
+    public static function extendActiveStatus($user, $method = 'repeat_order')
+    {
+        if (!$user->active_until) {
+            return;
+        }
+        
+        // Perpanjang 45 hari
+        $newActiveUntil = Carbon::parse($user->active_until)->addDays(45);
+        $user->update([
+            'active_until' => $newActiveUntil,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
+     * Cek dan update status aktif user
+     * Dipanggil setiap hari untuk mengecek masa aktif
+     */
+    public static function checkActiveStatus($date = null)
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+        
+        $users = User::whereNotNull('active_until')
+            ->where('active_until', '<', $date)
+            ->where('is_active', true)
+            ->get();
+        
+        foreach ($users as $user) {
+            $user->update(['is_active' => false]);
         }
     }
 }

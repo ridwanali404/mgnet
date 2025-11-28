@@ -153,6 +153,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('tree/parent/{user}', 'TreeController@parent');
     Route::get('tree/siblings/{user}', 'TreeController@siblings');
     Route::get('tree/families/{user}', 'TreeController@families');
+    Route::get('tree/recent-bonuses/{user}', 'TreeController@recentBonuses');
     Route::view('tree', 'tree');
     Route::resource('article', 'ArticleController');
 

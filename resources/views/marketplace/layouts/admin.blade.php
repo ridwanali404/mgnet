@@ -9,7 +9,7 @@
     <meta name="keywords" content="{{ App\Models\Customize::first()->meta_keywords }}">
 
     <title>{{ App\Models\Customize::first()->title }} | @yield('title')</title>
-    <link rel="icon" href="{{ asset(App\Models\Customize::first()->image_path) }}" type="image/png" />
+    <link rel="icon" href="{{ asset('images/mgnet-favicon.png') }}" type="image/png" />
 
     <link href="{{ asset('inspinia/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('inspinia/font-awesome/css/font-awesome.min.css') }}" rel="stylesheet">

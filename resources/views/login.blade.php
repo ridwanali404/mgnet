@@ -9,7 +9,7 @@
     <meta name="description" content="{{ App\Models\Customize::first()->meta_description }}">
     <meta name="keywords" content="{{ App\Models\Customize::first()->meta_keywords }}">
     <!-- Favicon icon -->
-    <link rel="icon" href="{{ asset(App\Models\Customize::first()->image_path) }}" type="image/png" />
+    <link rel="icon" href="{{ asset('images/mgnet-favicon.png') }}" type="image/png" />
     <title>{{ App\Models\Customize::first()->title }} | Login</title>
     <!-- Bootstrap Core CSS -->
     <link href="{{ asset('material-pro/assets/plugins/bootstrap/css/bootstrap.min.css') }} " rel="stylesheet">

@@ -11,6 +11,26 @@
             overflow: auto;
             text-align: center;
         }
+        
+        /* Styling warna text untuk paket Gold */
+        .package-gold.orgchart-node .title,
+        .orgchart-node.package-gold .title {
+            color: #FFD700 !important;
+            font-weight: bold;
+        }
+        
+        /* Styling warna text untuk paket Platinum */
+        .package-platinum.orgchart-node .title,
+        .orgchart-node.package-platinum .title {
+            color: #C0C0C0 !important;
+            font-weight: bold;
+        }
+        
+        /* Styling warna text untuk paket Free */
+        .package-free.orgchart-node .title,
+        .orgchart-node.package-free .title {
+            color: #808080 !important;
+        }
     </style>
 @endsection
 @php
@@ -41,6 +61,52 @@
             style="{{ auth()->user()->type == 'admin' ? 'height: calc(100vh - 334px);' : 'height: calc(100vh - 272px);' }}">
             <div class="card-body table-responsive p-0">
                 <div id="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recent Bonus -->
+    <div class="modal fade" id="recentBonusModal" tabindex="-1" role="dialog" aria-labelledby="recentBonusModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recentBonusModalLabel">Recent Bonus - <span id="modalUserName"></span></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="bonusLoading" class="text-center" style="display: none;">
+                        <div class="spinner-border" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                        <p>Memuat data bonus...</p>
+                    </div>
+                    <div id="bonusContent" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>No</th>
+                                        <th>Tanggal</th>
+                                        <th>Tipe</th>
+                                        <th>Deskripsi</th>
+                                        <th>Jumlah</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bonusTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="bonusEmpty" style="display: none;" class="text-center text-muted">
+                            <p>Tidak ada data bonus</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                </div>
             </div>
         </div>
     </div>
@@ -213,12 +279,254 @@
                             return '/tree/families/' + nodeData.id;
                         }
                     };
-                    $('#chart-container').orgchart({
+                    
+                    // Store package data untuk digunakan nanti
+                    var packageDataMap = {};
+                    function buildPackageMap(nodeData) {
+                        if (nodeData) {
+                            packageDataMap[nodeData.id] = nodeData.packageClass || '';
+                            if (nodeData.children) {
+                                nodeData.children.forEach(function(child) {
+                                    buildPackageMap(child);
+                                });
+                            }
+                        }
+                    }
+                    buildPackageMap(response);
+                    
+                    // Function untuk apply package class
+                    function applyPackageClassToNode(nodeId, packageClass) {
+                        if (packageClass) {
+                            // Coba beberapa selector yang mungkin digunakan orgchart
+                            var selectors = [
+                                '[data-id="' + nodeId + '"]',
+                                '.orgchart-node[data-id="' + nodeId + '"]',
+                                '#chart-container [data-id="' + nodeId + '"]'
+                            ];
+                            
+                            selectors.forEach(function(selector) {
+                                var $node = $(selector);
+                                if ($node.length) {
+                                    $node.addClass(packageClass);
+                                    // Juga coba find parent orgchart-node
+                                    $node.closest('.orgchart-node').addClass(packageClass);
+                                }
+                            });
+                            
+                            // Coba dengan mencari berdasarkan text content
+                            $('#chart-container').find('.orgchart-node').each(function() {
+                                var $node = $(this);
+                                var nodeText = $node.text();
+                                // Cek apakah node ini sesuai dengan data
+                                if (response.id == nodeId || (response.children && response.children.some(function(c) {
+                                    return c.id == nodeId && nodeText.indexOf(c.name) !== -1;
+                                }))) {
+                                    $node.addClass(packageClass);
+                                }
+                            });
+                        }
+                    }
+                    
+                    var orgchart = $('#chart-container').orgchart({
                         'data': response,
                         'ajaxURL': ajaxURLs,
                         'nodeContent': 'title',
-                        'nodeId': 'id'
+                        'nodeId': 'id',
+                        'createNode': function($node, data) {
+                            // Apply package class langsung saat node dibuat
+                            if (data.packageClass) {
+                                $node.addClass(data.packageClass);
+                                
+                                var $title = $node.find('.title');
+                                
+                                // Hanya ubah warna text di title sesuai package
+                                if (data.packageClass === 'package-gold') {
+                                    $title.css({
+                                        'color': '#FFD700',
+                                        'font-weight': 'bold'
+                                    });
+                                } else if (data.packageClass === 'package-platinum') {
+                                    $title.css({
+                                        'color': '#C0C0C0',
+                                        'font-weight': 'bold'
+                                    });
+                                } else if (data.packageClass === 'package-free') {
+                                    $title.css({
+                                        'color': '#808080'
+                                    });
+                                }
+                            }
+                            
+                            // Tambahkan event handler untuk klik node (jika ada function showRecentBonuses)
+                            if (typeof showRecentBonuses === 'function') {
+                                $node.on('click', function(e) {
+                                    e.stopPropagation();
+                                    var userId = data.id;
+                                    showRecentBonuses(userId, data.name || data.title);
+                                });
+                                
+                                // Tambahkan cursor pointer untuk menunjukkan bahwa node bisa diklik
+                                $node.css('cursor', 'pointer');
+                            }
+                        }
                     });
+                    
+                    // Function untuk apply package class/style
+                    function applyPackageStyle() {
+                        // Iterate melalui semua node di orgchart
+                        $('#chart-container').find('.orgchart-node').each(function() {
+                            var $node = $(this);
+                            var nodeId = $node.attr('data-id') || $node.closest('[data-id]').attr('data-id');
+                            
+                            if (!nodeId) {
+                                // Coba cari berdasarkan text content
+                                var nodeText = $node.text().trim();
+                                Object.keys(packageDataMap).forEach(function(id) {
+                                    var nodeData = findNodeInData(response, id);
+                                    if (nodeData && (nodeText.indexOf(nodeData.name) !== -1 || nodeText.indexOf(nodeData.title) !== -1)) {
+                                        nodeId = id;
+                                    }
+                                });
+                            }
+                            
+                            if (nodeId && packageDataMap[nodeId]) {
+                                var packageClass = packageDataMap[nodeId];
+                                $node.addClass(packageClass);
+                                
+                                // Apply inline style untuk warna text di title
+                                var $title = $node.find('.title');
+                                
+                                if (packageClass === 'package-gold') {
+                                    $title.css('color', '#FFD700').css('font-weight', 'bold');
+                                } else if (packageClass === 'package-platinum') {
+                                    $title.css('color', '#C0C0C0').css('font-weight', 'bold');
+                                } else if (packageClass === 'package-free') {
+                                    $title.css('color', '#808080');
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Helper function untuk find node dalam data
+                    function findNodeInData(data, nodeId) {
+                        if (String(data.id) === String(nodeId)) {
+                            return data;
+                        }
+                        if (data.children) {
+                            for (var i = 0; i < data.children.length; i++) {
+                                var found = findNodeInData(data.children[i], nodeId);
+                                if (found) return found;
+                            }
+                        }
+                        return null;
+                    }
+                    
+                    // Apply style setelah orgchart di-render dengan multiple attempts
+                    var attempts = [300, 600, 1000, 2000];
+                    attempts.forEach(function(delay) {
+                        setTimeout(applyPackageStyle, delay);
+                    });
+                    
+                    // Gunakan MutationObserver untuk detect node baru
+                    var observer = new MutationObserver(function(mutations) {
+                        applyPackageStyle();
+                    });
+                    
+                    observer.observe(document.getElementById('chart-container'), {
+                        childList: true,
+                        subtree: true
+                    });
+                    
+                    // Handle children yang di-load via ajax
+                    $(document).ajaxSuccess(function(event, xhr, settings) {
+                        if (settings.url && (settings.url.includes('/tree/children/') || 
+                            settings.url.includes('/tree/parent/') || 
+                            settings.url.includes('/tree/siblings/') || 
+                            settings.url.includes('/tree/families/'))) {
+                            setTimeout(function() {
+                                try {
+                                    var ajaxResponse = JSON.parse(xhr.responseText);
+                                    if (ajaxResponse.children) {
+                                        ajaxResponse.children.forEach(function(child) {
+                                            if (child.id && child.packageClass) {
+                                                packageDataMap[child.id] = child.packageClass;
+                                            }
+                                        });
+                                    }
+                                    if (ajaxResponse.id && ajaxResponse.packageClass) {
+                                        packageDataMap[ajaxResponse.id] = ajaxResponse.packageClass;
+                                    }
+                                    applyPackageStyle();
+                                    
+                                    // Tambahkan event handler untuk node baru yang di-load via AJAX
+                                    $('#chart-container').find('.orgchart-node').off('click.bonus').on('click.bonus', function(e) {
+                                        e.stopPropagation();
+                                        var $node = $(this);
+                                        var nodeId = $node.attr('data-id') || $node.closest('[data-id]').attr('data-id');
+                                        
+                                        if (!nodeId) {
+                                            // Coba cari dari text content
+                                            var nodeText = $node.find('.title').text() || $node.text();
+                                            // Cari di response data
+                                            function findNodeIdInData(data, searchText) {
+                                                if (data.id && (data.name === searchText || data.title === searchText)) {
+                                                    return data.id;
+                                                }
+                                                if (data.children) {
+                                                    for (var i = 0; i < data.children.length; i++) {
+                                                        var found = findNodeIdInData(data.children[i], searchText);
+                                                        if (found) return found;
+                                                    }
+                                                }
+                                                return null;
+                                            }
+                                            nodeId = findNodeIdInData(response, nodeText.trim());
+                                        }
+                                        
+                                        if (nodeId) {
+                                            var nodeName = $node.find('.title').text() || $node.text();
+                                            showRecentBonuses(nodeId, nodeName);
+                                        }
+                                    });
+                                } catch(e) {
+                                    // Ignore parse errors
+                                }
+                            }, 200);
+                        }
+                    });
+                    
+                    // Tambahkan event handler untuk semua node yang sudah ada
+                    setTimeout(function() {
+                        $('#chart-container').find('.orgchart-node').off('click.bonus').on('click.bonus', function(e) {
+                            e.stopPropagation();
+                            var $node = $(this);
+                            var nodeId = $node.attr('data-id') || $node.closest('[data-id]').attr('data-id');
+                            
+                            if (!nodeId) {
+                                // Coba cari dari text content
+                                var nodeText = $node.find('.title').text() || $node.text();
+                                // Cari di response data
+                                function findNodeIdInData(data, searchText) {
+                                    if (data.id && (data.name === searchText || data.title === searchText)) {
+                                        return data.id;
+                                    }
+                                    if (data.children) {
+                                        for (var i = 0; i < data.children.length; i++) {
+                                            var found = findNodeIdInData(data.children[i], searchText);
+                                            if (found) return found;
+                                        }
+                                    }
+                                    return null;
+                                }
+                                nodeId = findNodeIdInData(response, nodeText.trim());
+                            }
+                            
+                            if (nodeId) {
+                                var nodeName = $node.find('.title').text() || $node.text();
+                                showRecentBonuses(nodeId, nodeName);
+                            }
+                        });
+                    }, 500);
                 },
             });
         }
@@ -255,4 +563,66 @@
             });
         </script>
     @endif
+    
+    <script>
+        function showRecentBonuses(userId, userName) {
+            // Tampilkan modal
+            $('#recentBonusModal').modal('show');
+            $('#modalUserName').text(userName || 'User #' + userId);
+            
+            // Reset content
+            $('#bonusLoading').show();
+            $('#bonusContent').hide();
+            $('#bonusEmpty').hide();
+            $('#bonusTableBody').empty();
+            
+            // Load data dengan AJAX
+            $.ajax({
+                url: '/tree/recent-bonuses/' + userId,
+                method: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    $('#bonusLoading').hide();
+                    
+                    if (response.bonuses && response.bonuses.length > 0) {
+                        $('#bonusContent').show();
+                        var tbody = $('#bonusTableBody');
+                        tbody.empty();
+                        
+                        response.bonuses.forEach(function(bonus, index) {
+                            var status = '';
+                            if (bonus.paid_at) {
+                                status = '<span class="badge badge-success">Dibayar</span>';
+                            } else if (bonus.used_at) {
+                                status = '<span class="badge badge-info">Digunakan</span>';
+                            } else {
+                                status = '<span class="badge badge-warning">Belum Dibayar</span>';
+                            }
+                            
+                            var amountText = bonus.is_poin ? 
+                                bonus.amount.toLocaleString('id-ID') + ' Poin' : 
+                                'Rp ' + bonus.amount.toLocaleString('id-ID');
+                            
+                            var row = '<tr>' +
+                                '<td>' + (index + 1) + '</td>' +
+                                '<td>' + bonus.created_at + '</td>' +
+                                '<td>' + bonus.type + '</td>' +
+                                '<td>' + (bonus.description || '-') + '</td>' +
+                                '<td>' + amountText + '</td>' +
+                                '<td>' + status + '</td>' +
+                                '</tr>';
+                            tbody.append(row);
+                        });
+                    } else {
+                        $('#bonusEmpty').show();
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#bonusLoading').hide();
+                    $('#bonusEmpty').show();
+                    $('#bonusEmpty').html('<p class="text-danger">Error memuat data bonus: ' + error + '</p>');
+                }
+            });
+        }
+    </script>
 @endsection

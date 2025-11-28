@@ -3,7 +3,7 @@
 @section('style')
     <link href="{{ asset('material-pro/assets/plugins/select2/dist/css/select2.min.css') }}" rel="stylesheet"
         type="text/css" />
-    <link href="{{ asset('tree/style.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/tree/style.css') }}" rel="stylesheet">
 @endsection
 @php
 @endphp

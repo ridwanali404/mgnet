@@ -5,10 +5,10 @@
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <meta name="description" content="{{ App\Models\Customize::first()->meta_description }}">
     <meta name="keywords" content="{{ App\Models\Customize::first()->meta_keywords }}">
-    <meta name="author" content="PT BISNIS SUKSES MULIA" />
+    <meta name="author" content="MG Network" />
 
     <title>{{ App\Models\Customize::first()->title }} | @yield('title')</title>
-    <link rel="icon" href="{{ asset(App\Models\Customize::first()->image_path) }}" type="image/png" />
+    <link rel="icon" href="{{ asset('images/mgnet-favicon.png') }}" type="image/png" />
 
     <!-- Stylesheets -->
     <link
@@ -123,7 +123,7 @@
 
                     <div class="col-12 col-lg-auto">
                         <p class="mb-0 d-flex justify-content-center justify-content-lg-start py-3 py-lg-0">
-                            <strong>Selamat datang di Bisnis Sukses Mulia.</strong>
+                            <strong>Selamat datang di MG Network.</strong>
                         </p>
                     </div>
 
@@ -168,11 +168,11 @@
                         <!-- Logo -->
                         <div id="logo" class="me-lg-4">
                             <a href="{{ url('/') }}" class="standard-logo"><img
-                                    src="{{ asset('images/bisnissuksesmulia.png') }}"
-                                    alt="PT BISNIS SUKSES MULIA"></a>
+                                    src="{{ asset('images/mgnet.webp') }}"
+                                    alt="MG Network"></a>
                             <a href="{{ url('/') }}" class="retina-logo"><img
-                                    src="{{ asset('images/bisnissuksesmulia.png') }}"
-                                    alt="PT BISNIS SUKSES MULIA"></a>
+                                    src="{{ asset('images/mgnet.webp') }}"
+                                    alt="MG Network"></a>
                         </div><!-- #logo end -->
 
                         <div class="header-misc">
@@ -373,13 +373,13 @@
                     <button type="button" data-bs-target="#carouselExampleCaptions"
                         data-bs-slide-to="{{ $loop->index }}"
                         {{ $loop->first ? 'class=active aria-current=true' : '' }}
-                        aria-label="PT. BISNIS SUKSES MULIA"></button>
+                        aria-label="MG Network"></button>
                 @endforeach
             </div>
             <div class="carousel-inner">
                 @foreach (App\Models\Banner::orderBy('number')->get() as $a)
                     <div class="carousel-item {{ $loop->first ? 'active' : '' }}">
-                        <img src="{{ url($a->image_path) }}" class="d-block w-100" alt="PT. Bisnis Sukses Mulia"
+                        <img src="{{ url($a->image_path) }}" class="d-block w-100" alt="MG Network"
                             style="{{ $loop->first && (request()->sponsor || isset($_COOKIE['sponsor'])) ? 'filter: brightness(25%)' : '' }}">
                         @if ($loop->first)
                             <div class="carousel-caption">
@@ -613,7 +613,7 @@
 
                     <div class="row justify-content-between align-items-center">
                         <div class="col-md-6">
-                            Copyrights &copy; 2021 All Rights Reserved by Bisnis Sukses Mulia<br>
+                            Copyrights &copy; 2025 All Rights Reserved by MG Network<br>
                             <div class="copyright-links"><a href="#">Terms of Use</a> / <a
                                     href="#">Privacy Policy</a></div>
                         </div>

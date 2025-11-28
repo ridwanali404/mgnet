@@ -40,6 +40,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'active_until' => 'date',
         'roles' => 'array',
     ];
 
@@ -220,6 +221,21 @@ class User extends Authenticatable
     public function bonuses()
     {
         return $this->hasMany(Bonus::class);
+    }
+
+    public function profitSharings()
+    {
+        return $this->hasMany(ProfitSharing::class);
+    }
+
+    public function powerPlusQualifications()
+    {
+        return $this->hasMany(PowerPlusQualification::class);
+    }
+
+    public function umrohTripSavings()
+    {
+        return $this->hasMany(UmrohTripSaving::class);
     }
 
     public function weeklyBonuses($week)

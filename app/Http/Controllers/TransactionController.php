@@ -165,7 +165,7 @@ class TransactionController extends Controller
             if (env('MAIL_USERNAME')) {
                 Mail::send('mail.transaction', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)->subject('Transaksi');
-                    $message->from('cs.ptbisnissuksesmulia@gmail.com','PT BISNIS SUKSES MULIA');
+                    $message->from('cs.ptbisnissuksesmulia@gmail.com','MG Network');
                 });
             }
             return $transaction->id;
@@ -181,7 +181,7 @@ class TransactionController extends Controller
             if (env('MAIL_USERNAME')) {
                 Mail::send('mail.transaction', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)->subject('Transaksi');
-                    $message->from('cs.ptbisnissuksesmulia@gmail.com','PT BISNIS SUKSES MULIA');
+                    $message->from('cs.ptbisnissuksesmulia@gmail.com','MG Network');
                 });
             }
 

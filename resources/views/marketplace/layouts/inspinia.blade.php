@@ -10,7 +10,7 @@
     <meta name="author" content="">
 
     <title>{{ App\Models\Customize::first()->title }} | @yield('title')</title>
-    <link rel="icon" href="{{ asset(App\Models\Customize::first()->image_path) }}" type="image/png" />
+    <link rel="icon" href="{{ asset('images/mgnet-favicon.png') }}" type="image/png" />
 
     <!-- Bootstrap core CSS -->
     <link href="{{ asset('inspinia/css/bootstrap.min.css') }}" rel="stylesheet">

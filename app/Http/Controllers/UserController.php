@@ -123,7 +123,7 @@ class UserController extends Controller
             );
             Mail::send('mail.register', $data, function ($message) use ($to_name, $to_email) {
                 $message->to($to_email, $to_name)->subject('Registrasi');
-                $message->from('bsmcrid@gmail.com', 'PT BISNIS SUKSES MULIA');
+                $message->from('bsmcrid@gmail.com', 'MG Network');
             });
         }
         Session::flash('success', 'Registrasi berhasil');
@@ -211,7 +211,7 @@ class UserController extends Controller
             if (env('MAIL_USERNAME')) {
                 Mail::send('mail.register', $data, function ($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)->subject('Registrasi');
-                    $message->from('bsmcrid@gmail.com', 'PT BISNIS SUKSES MULIA');
+                    $message->from('bsmcrid@gmail.com', 'MG Network');
                 });
             }
 

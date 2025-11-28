@@ -9,8 +9,8 @@
     <meta name="description" content="">
     <meta name="author" content="">
     <!-- Favicon icon -->
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/bsm.png') }}">
-    <title>Bisnis Sukses Mulia | @yield('title')</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/mgnet-favicon.png') }}">
+    <title>MG Network | @yield('title')</title>
     <!-- Bootstrap Core CSS -->
     <link href="{{ asset('material-pro/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <!-- toast CSS -->
@@ -57,21 +57,19 @@
                         <b>
                             <!--You can put here icon as well // <i class="wi wi-sunset"></i> //-->
                             <!-- Dark Logo icon -->
-                            <img height="40" widht="40" src="{{ asset('images/cr-light-512.png') }}"
+                            <img height="40" widht="40" src="{{ asset('images/mgnet.webp') }}"
                                 alt="homepage" class="dark-logo" />
                             <!-- Light Logo icon -->
-                            <img height="40" widht="40" src="{{ asset('images/bsm.png') }}" alt="homepage"
+                            <img height="40" widht="40" src="{{ asset('images/mgnet.webp') }}" alt="homepage"
                                 class="light-logo" />
                         </b>
                         <!--End Logo icon -->
                         <!-- Logo text -->
                         <span>
                             <!-- dark Logo text -->
-                            <img height="40" src="{{ asset('images/cr-light-text.png') }}" alt="homepage"
-                                class="dark-logo" />
+                            <span class="dark-logo" style="font-size: 18px; font-weight: 600; color: #333; margin-left: 10px;">MG Network</span>
                             <!-- Light Logo text -->
-                            <img height="40" src="{{ asset('images/bsm-text.png') }}" class="light-logo"
-                                alt="homepage" />
+                            <span class="light-logo d-none" style="font-size: 18px; font-weight: 600; color: #fff; margin-left: 10px;">MG Network</span>
                         </span>
                     </a>
                 </div>
@@ -374,7 +372,7 @@
             <!-- footer -->
             <!-- ============================================================== -->
             <footer class="footer">
-                © 2023 <a href="{{ url('/') }}">Bisnis Sukses Mulia</a>
+                © 2025 <a href="{{ url('/') }}">MG Network</a>
             </footer>
             <!-- ============================================================== -->
             <!-- End footer -->
