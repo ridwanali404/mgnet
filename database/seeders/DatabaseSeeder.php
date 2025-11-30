@@ -182,6 +182,30 @@ class DatabaseSeeder extends Seeder
             'ro_price' => 12750000, // Harga RO 12.75 juta untuk Platinum
         ]);
 
+        // Pin Upgrade Gold ke Platinum: menggunakan selisih harga dan poin
+        // Harga: Rp 13.000.000 (selisih Platinum - Gold)
+        // Poin Pair: 1300 (selisih Platinum - Gold)
+        // RO Price: Rp 11.050.000 (selisih Platinum - Gold)
+        // Tidak memberikan bonus sponsor dan profit sharing
+        Pin::create([
+            'name' => 'Gold Upgrade Platinum',
+            'type' => 'upgrade',
+            'price' => 13000000, // Selisih: 15000000 - 2000000
+            'poin_pair' => 1300, // Selisih: 1500 - 200
+            'voucher_umroh' => 0, // Tidak ada tambahan voucher
+            'profit_sharing_percent' => 0, // Tidak memberikan profit sharing
+            'profit_sharing_max' => 0,
+            'trip_umroh_percent' => 0,
+            'bonus_sponsor_percent' => 0, // Tidak memberikan bonus sponsor
+            'monoleg_percent' => 0,
+            'generasi_percent' => 0,
+            'powerplus_percent' => 0,
+            'is_generasi' => false,
+            'level' => 2, // Level Platinum
+            'active_days' => 45, // Selisih: 90 - 45 (tambahan masa aktif)
+            'ro_price' => 11050000, // Selisih: 12750000 - 1700000
+        ]);
+
         $admin = User::create([
             'id' => 1,
             'image' => 0,

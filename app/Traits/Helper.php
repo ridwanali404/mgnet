@@ -128,21 +128,24 @@ trait Helper
             }
         } else {
             // Bonus Sponsor 15% - DIBUAT HARIAN (dibayar langsung saat upgrade)
-            $sponsor = $user->sponsor;
-            if ($sponsor && $sponsor->premiumUserPin()->count()) {
-                // Gunakan persentase jika ada, jika tidak gunakan nominal untuk backward compatibility
-                if ($pin->bonus_sponsor_percent > 0) {
-                    $amount = round($pin->price * $pin->bonus_sponsor_percent / 100);
-                } else {
-                    $amount = $pin->bonus_sponsor;
-                }
-                if ($amount > 0) {
-                    $bonus = $sponsor->bonuses()->create([
-                        'type' => 'Komisi Sponsor',
-                        'amount' => $amount,
-                        'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
-                    ]);
-                    Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+            // Skip bonus sponsor untuk pin upgrade (type = 'upgrade')
+            if ($pin->type != 'upgrade') {
+                $sponsor = $user->sponsor;
+                if ($sponsor && $sponsor->premiumUserPin()->count()) {
+                    // Gunakan persentase jika ada, jika tidak gunakan nominal untuk backward compatibility
+                    if ($pin->bonus_sponsor_percent > 0) {
+                        $amount = round($pin->price * $pin->bonus_sponsor_percent / 100);
+                    } else {
+                        $amount = $pin->bonus_sponsor;
+                    }
+                    if ($amount > 0) {
+                        $bonus = $sponsor->bonuses()->create([
+                            'type' => 'Komisi Sponsor',
+                            'amount' => $amount,
+                            'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
+                        ]);
+                        Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                    }
                 }
             }
             if ($pin->name == 'PIN PAKET RO') {
@@ -279,7 +282,8 @@ trait Helper
         }
 
         // Profit Sharing 5% (Khusus Platinum - hanya untuk aktivasi perdana)
-        if ($pin->name == 'Platinum' && $pin->profit_sharing_percent > 0) {
+        // Skip profit sharing untuk pin upgrade (type = 'upgrade')
+        if ($pin->type != 'upgrade' && $pin->name == 'Platinum' && $pin->profit_sharing_percent > 0) {
             // Cek apakah ini aktivasi perdana Platinum
             $isPerdana = !$user->profitSharings()->where('is_perdana_platinum', true)->exists();
             if ($isPerdana) {
