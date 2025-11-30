@@ -372,7 +372,25 @@ class UserController extends Controller
 
     public function filter()
     {
-        return User::select('id', 'username as text')->where('type', 'member')->where('username', 'like', request()->get('search') . '%')->paginate(10);
+        $query = User::select('id', 'username as text')->where('type', 'member');
+        
+        // Jika ada sponsor_id, hanya tampilkan downline dari sponsor tersebut
+        if (request()->has('sponsor_id') && request()->get('sponsor_id')) {
+            $sponsor = User::find(request()->get('sponsor_id'));
+            if ($sponsor) {
+                // Ambil semua ID downline dari sponsor (termasuk sponsor itu sendiri)
+                $downlineIds = $sponsor->descendants()->pluck('id')->toArray();
+                // Tambahkan sponsor itu sendiri ke dalam list
+                $downlineIds[] = $sponsor->id;
+                $query->whereIn('id', $downlineIds);
+            }
+        }
+        
+        if (request()->has('search') && request()->get('search')) {
+            $query->where('username', 'like', request()->get('search') . '%');
+        }
+        
+        return $query->paginate(10);
     }
 
     public function filterMember()

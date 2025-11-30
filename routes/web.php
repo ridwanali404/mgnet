@@ -167,6 +167,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::group(['middleware' => 'admin'], function () {
         Route::resource('pin', 'PinController');
         Route::put('weekly/confirm', 'BonusController@weeklyConfirmBulk');
+        Route::put('daily/confirm', 'BonusController@dailyConfirmBulk');
         Route::put('daily/{user}/confirm', 'BonusController@dailyConfirm');
         Route::put('daily/{user}/cancel', 'BonusController@dailyCancel');
         Route::put('weekly/{user}/confirm', 'BonusController@weeklyConfirm');

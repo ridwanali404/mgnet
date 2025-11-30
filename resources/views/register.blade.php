@@ -324,12 +324,27 @@
                         cache: true,
                     }
                 }).on("select2:select", function(e) {
+                    var sponsorId = e.params.data.id;
+                    var currentUplineId = $("select[name=upline_id]").val();
+                    
+                    // Jika upline sudah dipilih dan bukan sponsor itu sendiri, clear upline
+                    // Karena saat mencari upline, hanya downline dari sponsor yang akan muncul
+                    // Jadi upline yang sudah dipilih mungkin tidak valid lagi jika sponsor berubah
+                    if (currentUplineId && currentUplineId != sponsorId) {
+                        // Clear upline untuk memastikan konsistensi
+                        // User bisa memilih ulang dari daftar downline sponsor yang baru
+                        $("select[name=upline_id]").val(null).trigger('change');
+                    }
+                    
                     // Set default upline ke sponsor jika upline masih kosong
                     if (!$("select[name=upline_id]").val()) {
                         var sponsorData = e.params.data;
                         var newOption = new Option(sponsorData.text, sponsorData.id, true, true);
                         $("select[name=upline_id]").append(newOption).trigger('change');
                     }
+                }).on("select2:clear", function() {
+                    // Clear upline saat sponsor di-clear
+                    $("select[name=upline_id]").val(null).trigger('change');
                 });
                 
                 $("select[name=upline_id]").select2({
@@ -340,7 +355,8 @@
                         data: function(params) {
                             var query = {
                                 search: params.term,
-                                page: params.page || 1
+                                page: params.page || 1,
+                                sponsor_id: $("select[name=sponsor_id]").val() || ''
                             }
                             return query;
                         },

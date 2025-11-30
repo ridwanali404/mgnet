@@ -12,6 +12,11 @@
         .dt-bootstrap4 {
             padding: 0 !important;
         }
+        
+        [type="checkbox"]:not(:checked), [type="checkbox"]:checked {
+            position: unset !important;
+            opacity: 1 !important;
+        }
     </style>
 @endsection
 @php
@@ -41,12 +46,26 @@
         @if (Auth::user()->type == 'admin')
             <div class="card">
                 <div class="card-body">
-                    <h4 class="card-title">Bonus Harian</h4>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="card-title mb-0">Bonus Harian</h4>
+                        <form id="bulkConfirmForm" action="{{ url('daily/confirm') }}" method="POST" style="display: none;">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="date" value="{{ $date }}" />
+                            <input type="hidden" name="user_ids" id="bulkUserIds" value="" />
+                            <button type="submit" class="btn btn-success btn-rounded" id="bulkConfirmBtn" disabled>
+                                <i class="fa fa-check"></i> Konfirmasi Sekaligus (<span id="selectedCount">0</span>)
+                            </button>
+                        </form>
+                    </div>
                     <div class="table-responsive">
                         <table id="bonuses" class="display nowrap table table-hover table-striped table-bordered"
                             cellspacing="0" width="100%">
                             <thead>
                                 <tr>
+                                    <th data-orderable=false>
+                                        <input type="checkbox" id="checkAll" />
+                                    </th>
                                     <th data-orderable=false>#</th>
                                     <th>Join</th>
                                     <th>Member</th>
@@ -96,6 +115,11 @@
                                         $total_transfer = $total - $automaintain - $tax - $admin;
                                     @endphp
                                     <tr>
+                                        <td>
+                                            @if (!$today_paid && $total_transfer >= 50000)
+                                                <input type="checkbox" class="user-checkbox" value="{{ $a->id }}" />
+                                            @endif
+                                        </td>
                                         <td>{{ $loop->index + 1 }}</td>
                                         <td><code>{{ $a->created_at->format('Y-m-d') }}</code></td>
                                         <td>
@@ -570,7 +594,57 @@
     <!-- end - This is for export functionality only -->
     <script>
         jQuery(document).ready(function() {
-            $('#bonuses').DataTable({
+            // Check all functionality
+            $('#checkAll').on('click', function() {
+                $('.user-checkbox').prop('checked', this.checked);
+                updateBulkConfirmButton();
+            });
+
+            // Individual checkbox change
+            $(document).on('change', '.user-checkbox', function() {
+                var totalCheckboxes = $('.user-checkbox').length;
+                var checkedCheckboxes = $('.user-checkbox:checked').length;
+                $('#checkAll').prop('checked', totalCheckboxes === checkedCheckboxes);
+                updateBulkConfirmButton();
+            });
+
+            // Update bulk confirm button
+            function updateBulkConfirmButton() {
+                var checkedIds = $('.user-checkbox:checked').map(function() {
+                    return $(this).val();
+                }).get();
+                
+                if (checkedIds.length > 0) {
+                    $('#bulkUserIds').val(checkedIds.join(','));
+                    $('#bulkConfirmBtn').prop('disabled', false);
+                    $('#bulkConfirmForm').show();
+                    $('#selectedCount').text(checkedIds.length);
+                } else {
+                    $('#bulkConfirmBtn').prop('disabled', true);
+                    $('#bulkConfirmForm').hide();
+                    $('#selectedCount').text(0);
+                }
+            }
+
+            // Bulk confirm form submission
+            $('#bulkConfirmForm').on('submit', function(e) {
+                var checkedIds = $('.user-checkbox:checked').map(function() {
+                    return $(this).val();
+                }).get();
+                
+                if (checkedIds.length === 0) {
+                    e.preventDefault();
+                    alert('Pilih minimal satu record untuk dikonfirmasi');
+                    return false;
+                }
+                
+                if (!confirm('Apakah anda yakin ingin mengkonfirmasi ' + checkedIds.length + ' record sekaligus?')) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            var table = $('#bonuses').DataTable({
                 "language": {
                     "url": "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Indonesian.json"
                 },
@@ -579,8 +653,22 @@
                     'copy', 'csv', 'excel', 'pdf', 'print'
                 ],
                 order: [
-                    [1, 'asc']
+                    [2, 'asc']
                 ],
+                columnDefs: [
+                    { orderable: false, targets: [0, 1] }
+                ],
+                drawCallback: function() {
+                    // Restore checkbox states after DataTables draw
+                    var checkedIds = $('#bulkUserIds').val();
+                    if (checkedIds) {
+                        var ids = checkedIds.split(',');
+                        ids.forEach(function(id) {
+                            $('.user-checkbox[value="' + id + '"]').prop('checked', true);
+                        });
+                        updateBulkConfirmButton();
+                    }
+                }
             });
             $('#dailyUnilevelBonuses').DataTable({
                 "language": {

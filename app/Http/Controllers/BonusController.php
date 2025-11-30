@@ -128,6 +128,22 @@ class BonusController extends Controller
         return back();
     }
 
+    public function dailyConfirmBulk(Request $request)
+    {
+        $date = now();
+        $user_ids = explode(',', $request->user_ids);
+        foreach ($user_ids as $id) {
+            $user = User::find($id);
+            if ($user) {
+                $user->unpaidDaily($request->date)->update([
+                    'paid_at' => $date,
+                ]);
+            }
+        }
+        Session::flash('success', 'Konfirmasi berhasil');
+        return back();
+    }
+
     public function dailyCancel(Request $request, User $user)
     {
         $user->bonuses()->where('paid_at', $request->paid_at)->update([
