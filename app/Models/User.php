@@ -143,6 +143,16 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'sponsor_id');
     }
 
+    public function upline()
+    {
+        return $this->belongsTo(User::class, 'upline_id');
+    }
+
+    public function uplines()
+    {
+        return $this->hasMany(User::class, 'upline_id');
+    }
+
     public function freeSponsors()
     {
         return $this->sponsors()->whereHas('userPin', function ($q_userPin) {
@@ -820,6 +830,11 @@ class User extends Authenticatable
     public function dailyPoinSponsors()
     {
         return $this->hasManyThrough(DailyPoin::class, User::class, 'sponsor_id', 'user_id');
+    }
+
+    public function dailyPoinUplines()
+    {
+        return $this->hasManyThrough(DailyPoin::class, User::class, 'upline_id', 'user_id');
     }
 
     public function dailyBonuses($date)

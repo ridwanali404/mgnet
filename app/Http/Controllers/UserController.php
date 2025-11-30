@@ -82,6 +82,10 @@ class UserController extends Controller
             $password = $r['password'];
             $r['password'] = bcrypt($r['password']);
         }
+        // Set upline_id: jika kosong, gunakan sponsor_id
+        $sponsor_id = $r['sponsor_id'] ?? auth()->id();
+        $upline_id = $r['upline_id'] ?? $sponsor_id;
+        
         $createdUser = User::create([
             'name' => $r['name'],
             'email' => $r['email'],
@@ -93,7 +97,8 @@ class UserController extends Controller
             'ktp' => $r['ktp'],
             'npwp' => $r['npwp'],
             'password' => $r['password'],
-            'sponsor_id' => $r['sponsor_id'] ?? auth()->id(),
+            'sponsor_id' => $sponsor_id,
+            'upline_id' => $upline_id,
         ]);
         if ($user->type == 'admin') {
             $pin = Pin::find($r['pin_id']);

@@ -6,11 +6,32 @@ use App\Models\User;
 
 class TreeController extends Controller
 {
-    function relationship(User $user): string
+    private function getTreeType()
     {
-        $is_parent = $user->sponsor_id ? '1' : '0';
-        $is_siblings = $user->sponsor?->sponsors()->where('id', '!=', $user->id)->count() ? '1' : '0';
-        $is_children = $user->sponsors()->count() ? '1' : '0';
+        return request()->tree_type ?? 'upline'; // default: upline, option: sponsor
+    }
+
+    private function isSponsorTree()
+    {
+        return $this->getTreeType() === 'sponsor';
+    }
+
+    function relationship(User $user, $treeType = null): string
+    {
+        $treeType = $treeType ?? $this->getTreeType();
+        $isSponsorTree = $treeType === 'sponsor';
+        
+        $parentId = $isSponsorTree ? $user->sponsor_id : $user->upline_id;
+        $is_parent = $parentId ? '1' : '0';
+        
+        if ($isSponsorTree) {
+            $is_siblings = $user->sponsor?->sponsors()->where('id', '!=', $user->id)->count() ? '1' : '0';
+            $is_children = $user->sponsors()->count() ? '1' : '0';
+        } else {
+            $is_siblings = $user->upline?->uplines()->where('id', '!=', $user->id)->count() ? '1' : '0';
+            $is_children = $user->uplines()->count() ? '1' : '0';
+        }
+        
         return $is_parent . $is_siblings . $is_children;
     }
 
@@ -35,21 +56,27 @@ class TreeController extends Controller
         return 'package-free';
     }
 
-    private function buildTreeData(User $user, int $level = 0, int $maxLevel = 10)
+    private function buildTreeData(User $user, int $level = 0, int $maxLevel = 10, $treeType = null)
     {
+        $treeType = $treeType ?? $this->getTreeType();
+        $isSponsorTree = $treeType === 'sponsor';
+        
+        $children = $isSponsorTree ? $user->sponsors() : $user->uplines();
+        $childrenCount = $children->count();
+        
         $data = [
             'id' => (string) $user->id,
             'name' => $user->username,
             'title' => $user->name,
-            'relationship' => auth()->user()->type == 'admin' ? $this->relationship($user) : ('00' . ($user->sponsors()->count() ? '1' : '0')),
+            'relationship' => auth()->user()->type == 'admin' ? $this->relationship($user, $treeType) : ('00' . ($childrenCount ? '1' : '0')),
             'packageClass' => $this->packageClass($user),
         ];
 
         // Jika masih dalam batas level, load children
         if ($level < $maxLevel) {
-            $sponsors = $user->sponsors()->with('userPin.pin')->get();
-            $data['children'] = $sponsors->map(function ($a) use ($level, $maxLevel) {
-                return $this->buildTreeData($a, $level + 1, $maxLevel);
+            $childrenData = $children->with('userPin.pin')->get();
+            $data['children'] = $childrenData->map(function ($a) use ($level, $maxLevel, $treeType) {
+                return $this->buildTreeData($a, $level + 1, $maxLevel, $treeType);
             });
         }
 
@@ -62,18 +89,23 @@ class TreeController extends Controller
             ->with(['userPin.pin'])
             ->first();
         
-        return $this->buildTreeData($user, 0, 10);
+        $treeType = $this->getTreeType();
+        return $this->buildTreeData($user, 0, 10, $treeType);
     }
 
     public function children(User $user)
     {
+        $treeType = $this->getTreeType();
+        $isSponsorTree = $treeType === 'sponsor';
+        $children = $isSponsorTree ? $user->sponsors() : $user->uplines();
+        
         return [
-            'children' => $user->sponsors()->with('userPin.pin')->get()->map(function ($a) {
+            'children' => $children->with('userPin.pin')->get()->map(function ($a) use ($treeType) {
                 return [
                     'id' => (string) $a->id,
                     'name' => $a->username,
                     'title' => $a->name,
-                    'relationship' => $this->relationship($a),
+                    'relationship' => $this->relationship($a, $treeType),
                     'packageClass' => $this->packageClass($a),
                 ];
             }),
@@ -82,25 +114,50 @@ class TreeController extends Controller
 
     public function parent(User $user)
     {
-        $a = $user->sponsor()->with('userPin.pin')->first();
+        $treeType = $this->getTreeType();
+        $isSponsorTree = $treeType === 'sponsor';
+        $parent = $isSponsorTree ? $user->sponsor() : $user->upline();
+        
+        $a = $parent->with('userPin.pin')->first();
+        if (!$a) {
+            return null;
+        }
+        
         return [
             'id' => (string) $a->id,
             'name' => $a->username,
             'title' => $a->name,
-            'relationship' => $this->relationship($a),
+            'relationship' => $this->relationship($a, $treeType),
             'packageClass' => $this->packageClass($a),
         ];
     }
 
     public function siblings(User $user)
     {
+        $treeType = $this->getTreeType();
+        $isSponsorTree = $treeType === 'sponsor';
+        
+        if ($isSponsorTree) {
+            $parent = $user->sponsor;
+            if (!$parent) {
+                return ['siblings' => []];
+            }
+            $siblings = $parent->sponsors()->where('id', '!=', $user->id);
+        } else {
+            $parent = $user->upline;
+            if (!$parent) {
+                return ['siblings' => []];
+            }
+            $siblings = $parent->uplines()->where('id', '!=', $user->id);
+        }
+        
         return [
-            'siblings' => $user->sponsor->sponsors()->with('userPin.pin')->where('id', '!=', $user->id)->get()->map(function ($a) {
+            'siblings' => $siblings->with('userPin.pin')->get()->map(function ($a) use ($treeType) {
                 return [
                     'id' => (string) $a->id,
                     'name' => $a->username,
                     'title' => $a->name,
-                    'relationship' => $this->relationship($a),
+                    'relationship' => $this->relationship($a, $treeType),
                     'packageClass' => $this->packageClass($a),
                 ];
             }),
@@ -109,21 +166,43 @@ class TreeController extends Controller
 
     public function families(User $user)
     {
-        $parent = User::where('id', $user->sponsor_id)->with(['userPin.pin', 'sponsors' => function ($q) {
-            $q->with('userPin.pin');
-        }])->first();
+        $treeType = $this->getTreeType();
+        $isSponsorTree = $treeType === 'sponsor';
+        
+        $parentId = $isSponsorTree ? $user->sponsor_id : $user->upline_id;
+        if (!$parentId) {
+            return null;
+        }
+        
+        $parent = User::where('id', $parentId)->with(['userPin.pin'])->first();
+        if (!$parent) {
+            return null;
+        }
+        
+        if ($isSponsorTree) {
+            $parent->load(['sponsors' => function ($q) {
+                $q->with('userPin.pin');
+            }]);
+            $siblings = $parent->sponsors()->where('id', '!=', $user->id);
+        } else {
+            $parent->load(['uplines' => function ($q) {
+                $q->with('userPin.pin');
+            }]);
+            $siblings = $parent->uplines()->where('id', '!=', $user->id);
+        }
+        
         return [
             'id' => (string) $parent->id,
             'name' => $parent->username,
             'title' => $parent->name,
-            'relationship' => $this->relationship($user),
+            'relationship' => $this->relationship($user, $treeType),
             'packageClass' => $this->packageClass($parent),
-            'children' => $parent->sponsors()->where('id', '!=', $user->id)->get()->map(function ($a) {
+            'children' => $siblings->get()->map(function ($a) use ($treeType) {
                 return [
                     'id' => (string) $a->id,
                     'name' => $a->username,
                     'title' => $a->name,
-                    'relationship' => $this->relationship($a),
+                    'relationship' => $this->relationship($a, $treeType),
                     'packageClass' => $this->packageClass($a),
                 ];
             }),

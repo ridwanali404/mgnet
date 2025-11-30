@@ -475,13 +475,13 @@ trait Helper
                     'BSM PLATINUM UP',
                 ])->whereDate('updated_at', '<=', $date);
             })
-                ->whereHas('dailyPoinSponsors', function ($q) use ($date) {
+                ->whereHas('dailyPoinUplines', function ($q) use ($date) {
                     $q->where('date', $date);
                 })
                 ->get();
             foreach ($qualifiedUsers as $user) {
-                // pair bonus
-                $pp_dailyPoinSponsors = $user->dailyPoinSponsors()->where('date', $date)->orderBy('pp', 'desc')->get();
+                // pair bonus - menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+                $pp_dailyPoinSponsors = $user->dailyPoinUplines()->where('date', $date)->orderBy('pp', 'desc')->get();
                 $pp_before_user = $user->dailyProfits()->where('date', '<', $date)->orderBy('date', 'desc')->first();
                 if ($pp_before_user && $pp_before_user->pp_id) {
                     if ($pp_dailyPoinSponsors->where('user_id', $pp_before_user->pp_id)->count()) {
@@ -527,8 +527,8 @@ trait Helper
                 $pp_used = min($pp_l, $pp_r);
                 $pp_diff = abs($pp_l - $pp_r);
 
-                // reward
-                $pr_dailyPoinSponsors = $user->dailyPoinSponsors()->where('date', $date)->orderBy('pr', 'desc')->get();
+                // reward - menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+                $pr_dailyPoinSponsors = $user->dailyPoinUplines()->where('date', $date)->orderBy('pr', 'desc')->get();
                 $pr_before_user = $user->dailyProfits()->where('date', '<', $date)->orderBy('date', 'desc')->first();
                 if ($pr_before_user && $pr_before_user->pr_id) {
                     if ($pr_dailyPoinSponsors->where('user_id', $pr_before_user->pr_id)->count()) {
@@ -801,7 +801,8 @@ trait Helper
         
         foreach ($platinumUsers as $user) {
             // Cek apakah user sudah Qualified (minimal 3 tim aktif)
-            $activeTeams = $user->sponsors()
+            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+            $activeTeams = $user->uplines()
                 ->whereHas('premiumUserPin')
                 ->where('is_active', true)
                 ->count();
@@ -874,11 +875,12 @@ trait Helper
             ->where('is_active', true)
             ->get()
             ->filter(function ($user) {
-                $leftTeam = $user->sponsors()->where('placement_side', 'left')
+                // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+                $leftTeam = $user->uplines()->where('placement_side', 'left')
                     ->whereHas('premiumUserPin')
                     ->where('is_active', true)
                     ->count();
-                $rightTeam = $user->sponsors()->where('placement_side', 'right')
+                $rightTeam = $user->uplines()->where('placement_side', 'right')
                     ->whereHas('premiumUserPin')
                     ->where('is_active', true)
                     ->count();
@@ -964,7 +966,8 @@ trait Helper
      */
     public static function calculateLegOmzet($user, $side, $date)
     {
-        $sponsors = $user->sponsors()->where('placement_side', $side)
+        // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+        $sponsors = $user->uplines()->where('placement_side', $side)
             ->whereHas('premiumUserPin')
             ->get();
         
@@ -991,7 +994,8 @@ trait Helper
         $startDate = $date->format('Y-m-01');
         $endDate = $date->format('Y-m-t');
         
-        $sponsors = $user->sponsors()->where('placement_side', $side)
+        // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+        $sponsors = $user->uplines()->where('placement_side', $side)
             ->whereHas('premiumUserPin')
             ->get();
         
@@ -1040,7 +1044,8 @@ trait Helper
         ->where('is_active', true)
         ->get()
         ->filter(function ($user) {
-            $activeTeams = $user->sponsors()
+            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+            $activeTeams = $user->uplines()
                 ->whereHas('premiumUserPin')
                 ->where('is_active', true)
                 ->count();
@@ -1056,7 +1061,7 @@ trait Helper
                 [
                     'yearly_accumulation' => 0,
                     'claimed_amount' => 0,
-                    'active_teams_count' => $user->sponsors()
+                    'active_teams_count' => $user->uplines()
                         ->whereHas('premiumUserPin')
                         ->where('is_active', true)
                         ->count(),

@@ -90,9 +90,10 @@ class MonthlyClosingController extends Controller
         $t_users = $userIdArray->groupBy('user_id')->pluck('user_id');
         foreach ($t_users as $userId) {
             $user = User::find($userId);
-            $sponsor = $user->sponsor;
+            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+            $upline = $user->upline;
             $i = 1;
-            while ($i <= 10 && $sponsor) {
+            while ($i <= 10 && $upline) {
                 $percent = KeyValue::where('key', 'monthly_ro_unilevel_'.$i)->value('value');
                 $userTransactions = clone $transactions;
                 $userTransactions = $userTransactions->where('user_id', $userId)->get();
@@ -110,20 +111,20 @@ class MonthlyClosingController extends Controller
                         }
                     }
                     $potency->push([
-                        'user_id' => $sponsor->id,
+                        'user_id' => $upline->id,
                         'type' => 'Bonus Unilevel RO',
                         'amount' => round($ut->poin * 1000 * $percent / 100),
                         'description' => 'Bonus Unilevel RO dari belanja '.$user->username.'. Belanja '.$carts. '. Generasi ke-'.$i.' sebesar '.$percent.'% dari '.$ut->poin.' poin.',
                         'created_at' => $ut->created_at,
                     ]);
                 }
-                if (!$sponsor->member) {
+                if (!$upline->member) {
                     break;
                 }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
+                if ($upline->member->member_phase_name != 'User Free' && $upline->monthlyQualified($month)) {
                     $i++;
                 }
-                $sponsor = $sponsor->sponsor;
+                $upline = $upline->upline;
             }
         }
         // official transaction
@@ -132,28 +133,29 @@ class MonthlyClosingController extends Controller
         $ot_users = $userIdArray->groupBy('user_id')->pluck('user_id');
         foreach ($ot_users as $userId) {
             $user = User::find($userId);
-            $sponsor = $user->sponsor;
+            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+            $upline = $user->upline;
             $i = 1;
-            while ($i <= 10 && $sponsor) {
+            while ($i <= 10 && $upline) {
                 $percent = KeyValue::where('key', 'monthly_ro_unilevel_'.$i)->value('value');
                 $userTransactions = clone $ot;
                 $userTransactions = $userTransactions->where('user_id', $userId)->get();
                 foreach ($userTransactions as $ut) {
                     $potency->push([
-                        'user_id' => $sponsor->id,
+                        'user_id' => $upline->id,
                         'type' => 'Bonus Unilevel RO',
                         'amount' => round($ut->poin * 1000 * $percent / 100),
                         'description' => 'Bonus Unilevel RO dari belanja official '.$user->username.'. Belanja '.$ut->qty.' '.($ut->product->name ?? 'Produk telah dihapus').' ('.$ut->poin.' poin)'.'. Generasi ke-'.$i.' sebesar '.$percent.'% dari '.$ut->poin.' poin.',
                         'created_at' => $ut->created_at,
                     ]);
                 }
-                if (!$sponsor->member) {
+                if (!$upline->member) {
                     break;
                 }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
+                if ($upline->member->member_phase_name != 'User Free' && $upline->monthlyQualified($month)) {
                     $i++;
                 }
-                $sponsor = $sponsor->sponsor;
+                $upline = $upline->upline;
             }
         }
         // pin
@@ -165,27 +167,28 @@ class MonthlyClosingController extends Controller
             $q->where('pv', '>', 0);
         })->get();
         foreach ($users as $user) {
-            $sponsor = $user->sponsor;
+            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+            $upline = $user->upline;
             $i = 1;
-            while ($i <= 10 && $sponsor) {
+            while ($i <= 10 && $upline) {
                 $percent = \App\Models\KeyValue::where('key', 'monthly_ro_unilevel_'.$i)->value('value');
                 $dp = $user->dailyPoins()->where('pv', '>', 0)->whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))->latest()->get();
                 foreach ($dp as $a) {
                     $potency->push([
-                        'user_id' => $sponsor->id,
+                        'user_id' => $upline->id,
                         'type' => 'Bonus Unilevel RO',
                         'amount' => round($a->pv * 1000 * $percent / 100),
                         'description' => 'Bonus Unilevel RO dari paket pin '.$a->user->username.' sejumlah '.$a->pv.' poin'.'. Generasi ke-'.$i.' sebesar '.$percent.'% dari '.$a->pv.' poin.',
                         'created_at' => $a->created_at,
                     ]);
                 }
-                if (!$sponsor->member) {
+                if (!$upline->member) {
                     break;
                 }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
+                if ($upline->member->member_phase_name != 'User Free' && $upline->monthlyQualified($month)) {
                     $i++;
                 }
-                $sponsor = $sponsor->sponsor;
+                $upline = $upline->upline;
             }
         }
         // do
@@ -201,24 +204,25 @@ class MonthlyClosingController extends Controller
             if (!$user->monthlyQualified($month)) {
                 $poin = $user->monthlyPoin($month);
                 if ($poin) {
-                    $sponsor = $user->sponsor;
+                    // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+                    $upline = $user->upline;
                     $i = 1;
-                    while ($sponsor) {
-                        if ($sponsor->monthlyQualified($month)) {
-                            $userPassUp = $userPassUpCollections->firstWhere('user_id', $sponsor->id);
+                    while ($upline) {
+                        if ($upline->monthlyQualified($month)) {
+                            $userPassUp = $userPassUpCollections->firstWhere('user_id', $upline->id);
                             if ($poin) {
                                 if ($userPassUp) {
                                     $userPassUp['poin'] += $poin;
                                 } else {
                                     $userPassUpCollections->push([
-                                        'user_id' => $sponsor->id,
+                                        'user_id' => $upline->id,
                                         'poin' => $poin,
                                     ]);
                                 }
                             }
                             break;
                         }
-                        $sponsor = $sponsor->sponsor;
+                        $upline = $upline->upline;
                     }
                 }
             }
@@ -315,16 +319,17 @@ class MonthlyClosingController extends Controller
             $poin = $user->monthlyPoin($month);
             if ($poin < 39) {
                 // find who is upper qualified
+                // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
                 $is_found = false;
-                $sponsor = $user->sponsor;
+                $upline = $user->upline;
                 $i = 1;
-                while ($sponsor) {
-                    if ($sponsor->monthlyQualified($month)) {
+                while ($upline) {
+                    if ($upline->monthlyQualified($month)) {
                         $is_found = true;
-                        $found = $sponsor;
+                        $found = $upline;
                         break;
                     }
-                    $sponsor = $sponsor->sponsor;
+                    $upline = $upline->upline;
                 }
             }
             print(($key + 1). ' | ' . $user->username. ' | ' . $poin . ' | ' . ($poin >= 39 ? 'Bonus RO Qualified' : 'Bonus RO Not Qualified') . ' | ' . ($poin >= 250 ? 'Bonus Royalti Qualified' : 'Bonus Royalti Not Qualified') .  ' | ' . ($poin < 39 ? ($is_found ? ($sponsor->username . ' is Upper Qualified') : 'Upper Qualified Not Found') : '') . '<br>' );

@@ -218,6 +218,7 @@ class DatabaseSeeder extends Seeder
             'bank_id' => 1,
             'bank_account' => '123456789',
             'bank_as' => 'PT Bisnis Sukses Mulia',
+            'upline_id' => null, // Admin tidak punya upline
         ]);
 
         $admin->addresses()->create([
@@ -402,6 +403,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $sponsorName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $sponsorUser->addresses()->create([
@@ -438,6 +440,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $goldUserName,
             'sponsor_id' => $sponsorUser->id,
+            'upline_id' => $sponsorUser->id, // Default: sama dengan sponsor_id
         ]);
 
         $goldUser->addresses()->create([
@@ -477,6 +480,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $platinumUserName,
             'sponsor_id' => $sponsorUser->id,
+            'upline_id' => $sponsorUser->id, // Default: sama dengan sponsor_id
         ]);
 
         $platinumUser->addresses()->create([
@@ -528,6 +532,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $rootUserName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $rootUser->addresses()->create([
@@ -573,6 +578,7 @@ class DatabaseSeeder extends Seeder
                 'bank_account' => $randomBankAccount(),
                 'bank_as' => $genUserName,
                 'sponsor_id' => $currentSponsor->id,
+                'upline_id' => $currentSponsor->id, // Default: sama dengan sponsor_id
             ]);
 
             $genUser->addresses()->create([
@@ -633,6 +639,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $monolegRootName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $monolegRoot->addresses()->create([
@@ -669,6 +676,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $leftSponsorName,
             'sponsor_id' => $monolegRoot->id,
+            'upline_id' => $monolegRoot->id, // Default: sama dengan sponsor_id
             'placement_side' => 'left',
         ]);
 
@@ -707,6 +715,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $rightUserName,
             'sponsor_id' => $monolegRoot->id,
+            'upline_id' => $monolegRoot->id, // Default: sama dengan sponsor_id
             'placement_side' => 'right',
         ]);
 
@@ -753,6 +762,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $profitSharingUserName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $profitSharingUser->addresses()->create([
@@ -797,6 +807,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $powerPlusRootName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $powerPlusRoot->addresses()->create([
@@ -834,6 +845,7 @@ class DatabaseSeeder extends Seeder
                 'bank_account' => $randomBankAccount(),
                 'bank_as' => $teamUserName,
                 'sponsor_id' => $powerPlusRoot->id,
+                'upline_id' => $powerPlusRoot->id, // Default: sama dengan sponsor_id
                 'placement_side' => $side,
             ]);
 
@@ -880,6 +892,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $umrohRootName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $umrohRoot->addresses()->create([
@@ -916,6 +929,7 @@ class DatabaseSeeder extends Seeder
                 'bank_account' => $randomBankAccount(),
                 'bank_as' => $teamUserName,
                 'sponsor_id' => $umrohRoot->id,
+                'upline_id' => $umrohRoot->id, // Default: sama dengan sponsor_id
                 'placement_side' => $i == 1 ? 'left' : ($i == 2 ? 'right' : 'left'),
             ]);
 
@@ -963,6 +977,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $activeGoldName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
             'active_until' => Carbon::now()->addDays(45),
             'active_days_initial' => 45,
             'is_active' => true,
@@ -1001,6 +1016,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $activePlatinumName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
             'active_until' => Carbon::now()->addDays(90),
             'active_days_initial' => 90,
             'is_active' => true,
@@ -1047,6 +1063,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $pushUpPlatRootName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
         ]);
 
         $pushUpPlatRoot->addresses()->create([
@@ -1082,6 +1099,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $pushUpGoldName,
             'sponsor_id' => $pushUpPlatRoot->id,
+            'upline_id' => $pushUpPlatRoot->id, // Default: sama dengan sponsor_id
         ]);
 
         $pushUpGold->addresses()->create([
@@ -1119,6 +1137,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $pushUpPlatBelowName,
             'sponsor_id' => $pushUpGold->id,
+            'upline_id' => $pushUpGold->id, // Default: sama dengan sponsor_id
         ]);
 
         $pushUpPlatBelow->addresses()->create([
@@ -1156,6 +1175,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $pushUpActiveRootName,
             'sponsor_id' => $admin->id,
+            'upline_id' => $admin->id, // Default: sama dengan sponsor_id
             'is_active' => true,
             'active_until' => Carbon::now()->addDays(30),
         ]);
@@ -1193,6 +1213,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $pushUpInactiveName,
             'sponsor_id' => $pushUpActiveRoot->id,
+            'upline_id' => $pushUpActiveRoot->id, // Default: sama dengan sponsor_id
             'is_active' => false,
             'active_until' => Carbon::now()->subDays(100), // Tidak aktif lebih dari 90 hari
         ]);
@@ -1237,6 +1258,7 @@ class DatabaseSeeder extends Seeder
             'bank_account' => $randomBankAccount(),
             'bank_as' => $pushUpBelowInactiveName,
             'sponsor_id' => $pushUpInactive->id,
+            'upline_id' => $pushUpInactive->id, // Default: sama dengan sponsor_id
         ]);
 
         $pushUpBelowInactive->addresses()->create([

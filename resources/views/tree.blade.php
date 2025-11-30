@@ -52,6 +52,18 @@
                 </div>
             </div>
         </div>
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <div class="btn-group" role="group" aria-label="Tree Type">
+                    <button type="button" class="btn btn-primary active" id="treeTypeUpline" data-tree-type="upline">
+                        Tree Upline
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" id="treeTypeSponsor" data-tree-type="sponsor">
+                        Tree Sponsor
+                    </button>
+                </div>
+            </div>
+        </div>
         @if (auth()->user()->type == 'admin')
             <div class="form-group">
                 <select id="users" style="width: 100%;"></select>
@@ -258,25 +270,46 @@
                 }
             });
             initOrgChart();
+            
+            // Handle tree type toggle
+            $('#treeTypeUpline, #treeTypeSponsor').on('click', function() {
+                var treeType = $(this).data('tree-type');
+                currentTreeType = treeType;
+                
+                // Update button states
+                $('#treeTypeUpline, #treeTypeSponsor').removeClass('active btn-primary').addClass('btn-outline-primary');
+                $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
+                
+                // Reload tree
+                var selectedUserId = $('#users').val();
+                initOrgChart(selectedUserId || null);
+            });
         });
 
+        var currentTreeType = 'upline'; // default tree type
+        
         function initOrgChart(user_id = null) {
             $('#chart-container').html('');
             $.ajax({
                 dataType: "json",
                 url: '/tree/dataSource',
                 data: {
-                    user_id: user_id
+                    user_id: user_id,
+                    tree_type: currentTreeType
                 },
                 success: function(response) {
                     var ajaxURLs = {
-                        'children': '/tree/children/',
-                        'parent': '/tree/parent/',
+                        'children': function(nodeData) {
+                            return '/tree/children/' + nodeData.id + '?tree_type=' + currentTreeType;
+                        },
+                        'parent': function(nodeData) {
+                            return '/tree/parent/' + nodeData.id + '?tree_type=' + currentTreeType;
+                        },
                         'siblings': function(nodeData) {
-                            return '/tree/siblings/' + nodeData.id;
+                            return '/tree/siblings/' + nodeData.id + '?tree_type=' + currentTreeType;
                         },
                         'families': function(nodeData) {
-                            return '/tree/families/' + nodeData.id;
+                            return '/tree/families/' + nodeData.id + '?tree_type=' + currentTreeType;
                         }
                     };
                     

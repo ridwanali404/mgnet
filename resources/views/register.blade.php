@@ -99,7 +99,16 @@
                                 <div class="form-group row">
                                     <label class="col-sm-3 text-right control-label col-form-label">Sponsor</label>
                                     <div class="col-sm-9">
-                                        <select name="sponsor_id" style="width: 100%;"></select>
+                                        <select name="sponsor_id" id="sponsor_id" style="width: 100%;"></select>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <label class="col-sm-3 text-right control-label col-form-label">Upline</label>
+                                    <div class="col-sm-9">
+                                        <select name="upline_id" id="upline_id" style="width: 100%;">
+                                            <option value="">Kosongkan (akan sama dengan Sponsor)</option>
+                                        </select>
+                                        <small class="form-text text-muted">Jika dikosongkan, upline akan sama dengan sponsor</small>
                                     </div>
                                 </div>
                                 <div class="form-group row">
@@ -302,6 +311,37 @@
                                 page: params.page || 1
                             }
                             // Query parameters will be ?search=[term]&page=[page]
+                            return query;
+                        },
+                        processResults: function(data) {
+                            return {
+                                results: data.data,
+                                pagination: {
+                                    more: (data.current_page * data.per_page) < data.total
+                                }
+                            };
+                        },
+                        cache: true,
+                    }
+                }).on("select2:select", function(e) {
+                    // Set default upline ke sponsor jika upline masih kosong
+                    if (!$("select[name=upline_id]").val()) {
+                        var sponsorData = e.params.data;
+                        var newOption = new Option(sponsorData.text, sponsorData.id, true, true);
+                        $("select[name=upline_id]").append(newOption).trigger('change');
+                    }
+                });
+                
+                $("select[name=upline_id]").select2({
+                    placeholder: "Cari upline...",
+                    allowClear: true,
+                    ajax: {
+                        url: '/filter-user',
+                        data: function(params) {
+                            var query = {
+                                search: params.term,
+                                page: params.page || 1
+                            }
                             return query;
                         },
                         processResults: function(data) {
