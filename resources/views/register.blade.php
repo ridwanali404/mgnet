@@ -62,6 +62,15 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="form-group row">
+                                    <label class="col-sm-3 text-right control-label col-form-label">Upline</label>
+                                    <div class="col-sm-9">
+                                        <select name="upline_id" id="upline_id_clone" style="width: 100%;">
+                                            <option value="">Kosongkan (akan sama dengan Sponsor)</option>
+                                        </select>
+                                        <small class="form-text text-muted">Jika dikosongkan, upline akan sama dengan sponsor ({{ auth()->user()->username }})</small>
+                                    </div>
+                                </div>
                                 <div class="form-group row{{ $errors->has('username') ? ' has-error' : '' }}">
                                     <label class="col-sm-3 text-right control-label col-form-label">Username</label>
                                     <div class="col-sm-9">
@@ -134,6 +143,15 @@
                                                 </option>
                                             @endforeach
                                         </select>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <label class="col-sm-3 text-right control-label col-form-label">Upline</label>
+                                    <div class="col-sm-9">
+                                        <select name="upline_id" id="upline_id_member" style="width: 100%;">
+                                            <option value="">Kosongkan (akan sama dengan Sponsor)</option>
+                                        </select>
+                                        <small class="form-text text-muted">Jika dikosongkan, upline akan sama dengan sponsor ({{ auth()->user()->username }})</small>
                                     </div>
                                 </div>
                             @endif
@@ -357,6 +375,64 @@
                                 search: params.term,
                                 page: params.page || 1,
                                 sponsor_id: $("select[name=sponsor_id]").val() || ''
+                            }
+                            return query;
+                        },
+                        processResults: function(data) {
+                            return {
+                                results: data.data,
+                                pagination: {
+                                    more: (data.current_page * data.per_page) < data.total
+                                }
+                            };
+                        },
+                        cache: true,
+                    }
+                });
+            });
+        </script>
+    @else
+        <script>
+            jQuery(document).ready(function() {
+                // Inisialisasi select2 untuk upline_id member
+                // Hanya menampilkan downline dari user yang sedang login
+                $("#upline_id_member").select2({
+                    placeholder: "Cari upline...",
+                    allowClear: true,
+                    ajax: {
+                        url: '/filter-user',
+                        data: function(params) {
+                            var query = {
+                                search: params.term,
+                                page: params.page || 1,
+                                sponsor_id: {{ auth()->id() }} // Filter berdasarkan downline user yang sedang login
+                            }
+                            return query;
+                        },
+                        processResults: function(data) {
+                            return {
+                                results: data.data,
+                                pagination: {
+                                    more: (data.current_page * data.per_page) < data.total
+                                }
+                            };
+                        },
+                        cache: true,
+                    }
+                });
+                
+                // Inisialisasi select2 untuk upline_id clone
+                // Hanya menampilkan downline dari user yang sedang login
+                $("#upline_id_clone").select2({
+                    placeholder: "Cari upline...",
+                    allowClear: true,
+                    ajax: {
+                        url: '/filter-user',
+                        data: function(params) {
+                            var query = {
+                                search: params.term,
+                                page: params.page || 1,
+                                sponsor_id: {{ auth()->id() }} // Filter berdasarkan downline user yang sedang login
                             }
                             return query;
                         },
