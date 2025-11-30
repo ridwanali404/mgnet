@@ -86,6 +86,25 @@ class UserController extends Controller
         $sponsor_id = $r['sponsor_id'] ?? auth()->id();
         $upline_id = $r['upline_id'] ?? $sponsor_id;
         
+        // Tentukan placement_side: sponsor pertama di kiri, sponsor kedua di kanan
+        $sponsor = User::find($sponsor_id);
+        $placement_side = null;
+        if ($sponsor) {
+            $sponsorCount = $sponsor->sponsors()->count();
+            // Sponsor pertama -> left, sponsor kedua -> right, seterusnya bergantian
+            if ($sponsorCount == 0) {
+                $placement_side = 'left';
+            } else if ($sponsorCount == 1) {
+                $placement_side = 'right';
+            } else {
+                // Untuk sponsor ketiga dan seterusnya, cek apakah ada yang di kiri atau kanan
+                $leftCount = $sponsor->sponsors()->where('placement_side', 'left')->count();
+                $rightCount = $sponsor->sponsors()->where('placement_side', 'right')->count();
+                // Tempatkan di sisi yang lebih sedikit
+                $placement_side = ($leftCount <= $rightCount) ? 'left' : 'right';
+            }
+        }
+        
         $createdUser = User::create([
             'name' => $r['name'],
             'email' => $r['email'],
@@ -99,6 +118,7 @@ class UserController extends Controller
             'password' => $r['password'],
             'sponsor_id' => $sponsor_id,
             'upline_id' => $upline_id,
+            'placement_side' => $placement_side,
         ]);
         if ($user->type == 'admin') {
             $pin = Pin::find($r['pin_id']);
