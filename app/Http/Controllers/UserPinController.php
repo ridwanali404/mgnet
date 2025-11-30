@@ -20,7 +20,7 @@ class UserPinController extends Controller
      */
     public function index()
     {
-        $pins = \App\Models\Pin::where('type', '!=', 'free')->whereNotIn('name', ['CR Reseller', 'Silver', 'Gold', 'Platinum'])->orderBy('type')->orderBy('price')->get();
+        $pins = \App\Models\Pin::where('type', '!=', 'free')->whereNotIn('name', ['CR Reseller', 'Silver'])->orderBy('type')->orderBy('price')->get();
         if (Auth::user()->type == 'admin') {
             $userPins = UserPin::whereNull('id')->get();
             $buy_pin_histories = PinHistory::latest()->whereNull('to_id')->get();

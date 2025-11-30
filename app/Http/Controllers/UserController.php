@@ -98,6 +98,7 @@ class UserController extends Controller
         if ($user->type == 'admin') {
             $pin = Pin::find($r['pin_id']);
             $userPin = UserPin::create([
+                'buyer_id' => $createdUser->id,
                 'user_id' => $createdUser->id,
                 'pin_id' => $pin->id,
                 'code' => strtoupper(str_random(6)),

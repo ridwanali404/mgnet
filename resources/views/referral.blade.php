@@ -102,7 +102,7 @@
                                     if ($activeUntil && $isActive) {
                                         $now = \Carbon\Carbon::now();
                                         $activeDate = \Carbon\Carbon::parse($activeUntil);
-                                        $daysLeft = floor($now->diffInDays($activeDate, false));
+                                        $daysLeft = ceil($now->diffInDays($activeDate, false));
                                         
                                         // Hanya tampilkan jika masih aktif (daysLeft > 0)
                                         if ($daysLeft <= 0) {
