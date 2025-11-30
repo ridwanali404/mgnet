@@ -2,6 +2,13 @@
 
 Dokumen ini menjelaskan jadwal perhitungan bonus berdasarkan spesifikasi yang telah ditetapkan.
 
+## ⚠️ CATATAN PENTING
+
+- **TIDAK ADA BONUS MINGGUAN** - Semua bonus dihitung harian atau bulanan
+- Bonus Harian: Sponsor, Monoleg, Generasi
+- Profit Sharing dan Trip Reward dihitung harian jika member sudah qualified
+- Power Plus dihitung bulanan berdasarkan omset poin grup bulanan
+
 ## 📅 BONUS YANG DIBAYAR HARIAN
 
 Bonus-bonus berikut **dibayar/dihitung harian**:
@@ -30,15 +37,15 @@ Bonus-bonus berikut **dibayar/dihitung harian**:
   - Tidak perlu perhitungan harian terpisah karena langsung dibuat saat event upgrade
 
 ### 4. Profit Sharing - 5%
-- **Status**: Dihitung harian jika sudah Qualified
+- **Status**: Dihitung harian jika sudah Qualified (hanya untuk Mitra Platinum)
 - **Lokasi**: `app/Traits/Helper.php` - fungsi `calculateProfitSharing()`
 - **Scheduler**: `app/Console/Kernel.php` - setiap hari jam 23:30
 - **Syarat Qualified**: 
-  - User Platinum aktivasi perdana
+  - User Platinum aktivasi perdana (hanya mitra Platinum)
   - Minimal 3 tim aktif
 - **Cara kerja**: 
   - Dihitung setiap hari dari omzet perusahaan hari tersebut
-  - Hanya untuk user yang sudah Qualified
+  - Hanya untuk user Platinum yang sudah Qualified
   - Akumulasi maksimal Rp 22.500.000
   - Payout dilakukan bulanan melalui `payoutProfitSharing()`
 
@@ -48,10 +55,10 @@ Bonus-bonus berikut **dibayar/dihitung harian**:
 - **Scheduler**: `app/Console/Kernel.php` - setiap hari jam 23:45
 - **Syarat Qualified**: 
   - User Gold atau Platinum
-  - Minimal 3 tim aktif
+  - Minimal 3 sponsor langsung (premium dan aktif)
 - **Cara kerja**: 
   - Dihitung setiap hari dari omzet perusahaan hari tersebut
-  - Hanya untuk user yang sudah Qualified
+  - Hanya untuk user yang sudah Qualified (sponsor minimal 3 orang)
   - Masuk ke tabel `umroh_trip_savings` (tabel klaim)
   - Akumulasi maksimal Rp 50.000.000 per tahun
   - Bisa diklaim untuk event perusahaan
@@ -107,16 +114,16 @@ Helper::calculatePowerPlus($month);
 | Bonus Sponsor | Harian | Upgrade | - |
 | Bonus Generasi | Harian | Upgrade | - |
 | Bonus Monoleg | Harian | Upgrade | Minimal 1 sponsor langsung |
-| Profit Sharing | Harian | Scheduler | Platinum perdana + 3 tim aktif |
-| Uang Trip | Harian | Scheduler | Gold/Platinum + 3 tim aktif |
-| Power Plus | Bulanan | Monthly Closing | 2 tim aktif + omzet minimal |
+| Profit Sharing | Harian | Scheduler | Platinum perdana + 3 tim aktif (hanya Mitra Platinum) |
+| Uang Trip | Harian | Scheduler | Gold/Platinum + sponsor minimal 3 orang |
+| Power Plus | Bulanan | Monthly Closing | 2 tim aktif + omzet minimal (omset poin grup bulanan) |
 
 ---
 
 ## 📝 CATATAN PENTING
 
-1. **Bonus Sponsor, Generasi, Monoleg**: Dibuat langsung saat upgrade, tidak perlu scheduler harian
-2. **Profit Sharing**: Dihitung harian tapi hanya untuk yang Qualified, payout bulanan
-3. **Uang Trip**: Dihitung harian untuk yang Qualified, masuk tabel klaim
-4. **Power Plus**: Hanya dihitung bulanan, bukan harian
+1. **Bonus Sponsor, Generasi, Monoleg**: Dibuat langsung saat upgrade (harian), tidak ada bonus mingguan
+2. **Profit Sharing**: Dihitung harian tapi hanya untuk Mitra Platinum yang Qualified, payout bulanan
+3. **Uang Trip**: Dihitung harian untuk yang Qualified (sponsor minimal 3 orang), masuk tabel klaim
+4. **Power Plus**: Hanya dihitung bulanan berdasarkan omset poin grup bulanan, bukan harian
 

@@ -242,8 +242,8 @@
                                 <ul aria-expanded="false" class="collapse">
                                     <li><a class="{{ request()->segment(1) == 'daily2' ? 'active' : '' }}"
                                             href="{{ url('daily2') }}">Bonus Harian</a></li>
-                                    <li><a class="{{ in_array(request()->segment(1), ['daily', 'weekly']) ? 'active' : '' }}"
-                                            href="{{ url('daily') }}">Bonus Mingguan</a></li>
+                                    {{-- <li><a class="{{ in_array(request()->segment(1), ['daily', 'weekly']) ? 'active' : '' }}"
+                                            href="{{ url('daily') }}">Bonus Mingguan</a></li> --}}
                                     <li><a class="{{ request()->segment(1) == 'monthly' ? 'active' : '' }}"
                                             href="{{ url('monthly') }}">Bonus Bulanan</a></li>
                                 </ul>
@@ -254,10 +254,10 @@
                                 <a href="{{ url('daily2') }}" aria-expanded="false"><i
                                         class="mdi mdi-gift"></i><span class="hide-menu">Bonus Harian</span></a>
                             </li>
-                            <li class="{{ in_array(request()->segment(1), ['daily', 'weekly']) ? 'active' : '' }}">
+                            {{-- <li class="{{ in_array(request()->segment(1), ['daily', 'weekly']) ? 'active' : '' }}">
                                 <a href="{{ url('daily') }}" aria-expanded="false"><i
                                         class="mdi mdi-gift"></i><span class="hide-menu">Bonus Mingguan</span></a>
-                            </li>
+                            </li> --}}
                             <li class="{{ request()->segment(1) == 'monthly' ? 'active' : '' }}">
                                 <a href="{{ url('monthly') }}" aria-expanded="false"><i
                                         class="mdi mdi-gift"></i><span class="hide-menu">Bonus Bulanan</span></a>

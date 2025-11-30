@@ -946,12 +946,12 @@ class User extends Authenticatable
 
     public function daily($date)
     {
-        return $this->bonuses()->whereIn('type', ['Komisi Sponsor', 'Komisi Monoleg'])->whereDate('created_at', $date);
+        return $this->bonuses()->whereIn('type', ['Komisi Sponsor', 'Komisi Monoleg', 'Bonus Generasi'])->whereDate('created_at', $date);
     }
 
     public function unpaidDaily($date)
     {
-        return $this->bonuses()->whereIn('type', ['Komisi Sponsor', 'Komisi Monoleg'])->whereDate('created_at', '<=', $date)->whereNull('paid_at');
+        return $this->bonuses()->whereIn('type', ['Komisi Sponsor', 'Komisi Monoleg', 'Bonus Generasi'])->whereDate('created_at', '<=', $date)->whereNull('paid_at');
     }
 
     public function monoleg(): BelongsTo

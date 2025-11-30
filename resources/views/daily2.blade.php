@@ -53,6 +53,7 @@
                                     <th>Rekening</th>
                                     <th class="text-right">Komisi Sponsor (Rp)</th>
                                     <th class="text-right">Komisi Monoleg (Rp)</th>
+                                    <th class="text-right">Komisi Generasi (Rp)</th>
                                     <th class="text-right">Total (Rp)</th>
                                     <th class="text-right">Automaintain (Rp)</th>
                                     <th class="text-right">Pajak (Rp)</th>
@@ -120,6 +121,9 @@
                                         </td>
                                         <td class="text-right">
                                             <code>{{ number_format($a->daily($date)->where('type', 'Komisi Monoleg')->sum('amount')) }}</code>
+                                        </td>
+                                        <td class="text-right">
+                                            <code>{{ number_format($a->daily($date)->where('type', 'Bonus Generasi')->sum('amount')) }}</code>
                                         </td>
                                         <td class="text-right">
                                             <code>{{ number_format($total) }}</code>
@@ -236,6 +240,12 @@
                             </td>
                             <td class="text-right">
                                 <code>{{ number_format($bonuses->where('type', 'Komisi Monoleg')->sum('amount')) }}</code>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Komisi Generasi (Rp)</td>
+                            <td class="text-right">
+                                <code>{{ number_format($bonuses->where('type', 'Bonus Generasi')->sum('amount')) }}</code>
                             </td>
                         </tr>
                         <tr>

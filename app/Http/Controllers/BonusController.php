@@ -96,7 +96,7 @@ class BonusController extends Controller
         $daily_admin_fee = 10000;
         if (Auth::user()->type == 'admin') {
             $users = User::where('type', 'member')->whereHas('bonuses', function ($q) use ($date) {
-                $q->whereIn('type', ['Komisi Sponsor', 'Komisi Monoleg'])->whereDate('created_at', $date);
+                $q->whereIn('type', ['Komisi Sponsor', 'Komisi Monoleg', 'Bonus Generasi'])->whereDate('created_at', $date);
             })->oldest()->get();
             return view('daily2', compact('users', 'daily_admin_fee'));
         }
