@@ -55,7 +55,7 @@
                                         <select name="user_pin_id" class="select2" style="width: 100%;" required>
                                             <option disabled selected>Pilih pin</option>
                                             @foreach ($userPins as $a)
-                                                <option value="{{ $a->id }}">CR-{{ strtoupper($a->code) }}
+                                                <option value="{{ $a->id }}">MG-{{ strtoupper($a->code) }}
                                                     ({{ $a->name }})
                                                 </option>
                                             @endforeach
@@ -138,7 +138,7 @@
                                         <select name="user_pin_id" class="select2" style="width: 100%;" required>
                                             <option disabled selected>Pilih pin</option>
                                             @foreach ($userPins as $a)
-                                                <option value="{{ $a->id }}">CR-{{ strtoupper($a->code) }}
+                                                <option value="{{ $a->id }}">MG-{{ strtoupper($a->code) }}
                                                     ({{ $a->name }})
                                                 </option>
                                             @endforeach
@@ -371,10 +371,15 @@
                     ajax: {
                         url: '/filter-user',
                         data: function(params) {
+                            var sponsorId = $("select[name=sponsor_id]").val();
                             var query = {
                                 search: params.term,
-                                page: params.page || 1,
-                                sponsor_id: $("select[name=sponsor_id]").val() || ''
+                                page: params.page || 1
+                            }
+                            // Gunakan Tree Upline (upline_id) bukan Tree Sponsor (sponsor_id)
+                            // Karena keterangan: "yang disajikan adalah semua mitra (data TREE UPLINE) di bawah akun dia"
+                            if (sponsorId) {
+                                query.upline_id = sponsorId; // Filter berdasarkan Tree Upline
                             }
                             return query;
                         },
@@ -395,7 +400,7 @@
         <script>
             jQuery(document).ready(function() {
                 // Inisialisasi select2 untuk upline_id member
-                // Hanya menampilkan downline dari user yang sedang login
+                // Hanya menampilkan downline dari user yang sedang login (Tree Upline, bukan Tree Sponsor)
                 $("#upline_id_member").select2({
                     placeholder: "Cari upline...",
                     allowClear: true,
@@ -405,7 +410,7 @@
                             var query = {
                                 search: params.term,
                                 page: params.page || 1,
-                                sponsor_id: {{ auth()->id() }} // Filter berdasarkan downline user yang sedang login
+                                upline_id: {{ auth()->id() }} // Filter berdasarkan Tree Upline (downline berdasarkan upline_id)
                             }
                             return query;
                         },
@@ -422,7 +427,7 @@
                 });
                 
                 // Inisialisasi select2 untuk upline_id clone
-                // Hanya menampilkan downline dari user yang sedang login
+                // Hanya menampilkan downline dari user yang sedang login (Tree Upline, bukan Tree Sponsor)
                 $("#upline_id_clone").select2({
                     placeholder: "Cari upline...",
                     allowClear: true,
@@ -432,7 +437,7 @@
                             var query = {
                                 search: params.term,
                                 page: params.page || 1,
-                                sponsor_id: {{ auth()->id() }} // Filter berdasarkan downline user yang sedang login
+                                upline_id: {{ auth()->id() }} // Filter berdasarkan Tree Upline (downline berdasarkan upline_id)
                             }
                             return query;
                         },

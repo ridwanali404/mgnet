@@ -50,8 +50,8 @@ class UserController extends Controller
             $pins = Pin::where('type', 'premium')->get();
             $compact[] = 'pins';
         } else {
-            $bsm = ['BSM SILVER', 'BSM GOLD', 'BSM PLATINUM', 'BSM SILVER UP', 'BSM GOLD UP', 'BSM PLATINUM UP'];
-            $userPins = auth()->user()->usableUserPins()->whereIn('name', $bsm)->get();
+            // Tampilkan semua pin tersedia, bukan hanya BSM
+            $userPins = auth()->user()->usableUserPins()->get();
             $compact[] = 'userPins';
         }
         return view('register', compact($compact));
@@ -86,25 +86,6 @@ class UserController extends Controller
         $sponsor_id = $r['sponsor_id'] ?? auth()->id();
         $upline_id = $r['upline_id'] ?? $sponsor_id;
         
-        // Tentukan placement_side: sponsor pertama di kiri, sponsor kedua di kanan
-        $sponsor = User::find($sponsor_id);
-        $placement_side = null;
-        if ($sponsor) {
-            $sponsorCount = $sponsor->sponsors()->count();
-            // Sponsor pertama -> left, sponsor kedua -> right, seterusnya bergantian
-            if ($sponsorCount == 0) {
-                $placement_side = 'left';
-            } else if ($sponsorCount == 1) {
-                $placement_side = 'right';
-            } else {
-                // Untuk sponsor ketiga dan seterusnya, cek apakah ada yang di kiri atau kanan
-                $leftCount = $sponsor->sponsors()->where('placement_side', 'left')->count();
-                $rightCount = $sponsor->sponsors()->where('placement_side', 'right')->count();
-                // Tempatkan di sisi yang lebih sedikit
-                $placement_side = ($leftCount <= $rightCount) ? 'left' : 'right';
-            }
-        }
-        
         $createdUser = User::create([
             'name' => $r['name'],
             'email' => $r['email'],
@@ -118,7 +99,6 @@ class UserController extends Controller
             'password' => $r['password'],
             'sponsor_id' => $sponsor_id,
             'upline_id' => $upline_id,
-            'placement_side' => $placement_side,
         ]);
         if ($user->type == 'admin') {
             $pin = Pin::find($r['pin_id']);
@@ -394,7 +374,7 @@ class UserController extends Controller
     {
         $query = User::select('id', 'username as text')->where('type', 'member');
         
-        // Jika ada sponsor_id, hanya tampilkan downline dari sponsor tersebut
+        // Jika ada sponsor_id, hanya tampilkan downline dari sponsor tersebut (Tree Sponsor)
         if (request()->has('sponsor_id') && request()->get('sponsor_id')) {
             $sponsor = User::find(request()->get('sponsor_id'));
             if ($sponsor) {
@@ -406,11 +386,40 @@ class UserController extends Controller
             }
         }
         
+        // Jika ada upline_id, hanya tampilkan downline dari upline tersebut (Tree Upline)
+        // Tree Upline menggunakan upline_id, bukan sponsor_id
+        if (request()->has('upline_id') && request()->get('upline_id')) {
+            $upline = User::find(request()->get('upline_id'));
+            if ($upline) {
+                // Ambil semua ID downline dari upline berdasarkan upline_id (Tree Upline)
+                $downlineIds = $this->getUplineDescendants($upline);
+                // Tambahkan upline itu sendiri ke dalam list
+                $downlineIds[] = $upline->id;
+                $query->whereIn('id', $downlineIds);
+            }
+        }
+        
         if (request()->has('search') && request()->get('search')) {
             $query->where('username', 'like', request()->get('search') . '%');
         }
         
         return $query->paginate(10);
+    }
+    
+    /**
+     * Get all descendants based on upline_id (Tree Upline)
+     * Recursive function to get all downlines
+     */
+    private function getUplineDescendants(User $user, $collected = [])
+    {
+        $downlines = $user->uplines()->pluck('id')->toArray();
+        $collected = array_merge($collected, $downlines);
+        
+        foreach ($user->uplines()->get() as $downline) {
+            $collected = $this->getUplineDescendants($downline, $collected);
+        }
+        
+        return $collected;
     }
 
     public function filterMember()

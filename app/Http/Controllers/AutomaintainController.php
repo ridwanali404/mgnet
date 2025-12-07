@@ -93,7 +93,8 @@ class AutomaintainController extends Controller
 
     public function claim(Request $request)
     {
-        if ($request->qty > floor(auth()->user()->cash_automaintain / 2000000)) {
+        // Automaintain limit adalah 1,7 juta (bukan 2 juta)
+        if ($request->qty > floor(auth()->user()->cash_automaintain / 1700000)) {
             session()->flash('fail', 'Saldo automaintain belum cukup');
             return back();
         }

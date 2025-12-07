@@ -10,6 +10,7 @@ use DB;
 use DateTime;
 use Laravel\Sanctum\HasApiTokens;
 use Carbon\Carbon;
+use App\Services\UserService;
 
 class User extends Authenticatable
 {
@@ -80,17 +81,17 @@ class User extends Authenticatable
 
     }
 
+    /**
+     * Get UserService instance
+     */
+    protected function userService()
+    {
+        return app(UserService::class);
+    }
+
     public function monthlyRank($month)
     {
-        if ($this->premiumUserPin) {
-            if ($this->monthlyPremiumSponsors($month)->count() >= 10) {
-                return 'Agen';
-            }
-            if ($this->monthlyAgenSponsors($month)->count() >= 10) {
-                return 'Distributor';
-            }
-        }
-        return false;
+        return $this->userService()->monthlyRank($this, $month);
     }
 
     public function address()
@@ -175,11 +176,6 @@ class User extends Authenticatable
                 $q_premiumSponsors->havingRaw('COUNT(*) >= 10');
             });
         }
-        // return $this->sponsors()->whereNull('id');
-        // ->has('premiumSponsors', '>=', 10);
-        // ->whereHas('premiumSponsors', function($q_premiumSponsors) {
-        //     $q_premiumSponsors->
-        // });
     }
 
     public function monthlyPremiumSponsors($month)
@@ -275,6 +271,8 @@ class User extends Authenticatable
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
+            $q->orWhere('type', 'Bonus Profit Sharing');
+            $q->orWhere('type', 'Bonus Power Plus');
         });
     }
 
@@ -286,6 +284,8 @@ class User extends Authenticatable
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
+            $q->orWhere('type', 'Bonus Profit Sharing');
+            $q->orWhere('type', 'Bonus Power Plus');
         })->whereNull('paid_at');
     }
 
@@ -324,203 +324,33 @@ class User extends Authenticatable
         });
     }
 
+    public function monthlyProfitSharingBonuses($month)
+    {
+        return $this->bonuses()->whereYear('created_at', date('Y', strtotime($month)))->whereMonth('created_at', date('m', strtotime($month)))->where(function ($q) {
+            $q->where('type', 'Bonus Profit Sharing');
+        });
+    }
+
+    public function monthlyPowerPlusBonuses($month)
+    {
+        return $this->bonuses()->whereYear('created_at', date('Y', strtotime($month)))->whereMonth('created_at', date('m', strtotime($month)))->where(function ($q) {
+            $q->where('type', 'Bonus Power Plus');
+        });
+    }
+
     public function monthlyQualified($month)
     {
-        $qty = $this->monthlyPoin($month);
-        if ($qty >= 39) {
-            return true;
-        }
-        return false;
+        return $this->userService()->monthlyQualified($this, $month);
     }
 
     public function monthlyRoyaltyQualified($month)
     {
-        $qty = $this->monthlyPoin($month);
-        if ($qty >= 250) {
-            return true;
-        }
-        return false;
+        return $this->userService()->monthlyRoyaltyQualified($this, $month);
     }
 
     public function monthlyPotency($month)
     {
-        $date = DateTime::createFromFormat('Y-m', $month);
-        $transactions = Transaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))
-            ->where('type', 'general')
-            ->where('poin', '>', 0)
-            ->whereHas('user', function ($q) {
-                $q->where('created_at', '>', $this->created_at);
-            })
-            ->whereHas('carts', function ($q_cart) {
-                $q_cart->whereHas('product', function ($q_product) {
-                    $q_product->where('is_ro', true);
-                });
-            })
-            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-            ->latest();
-        $userIdArray = clone $transactions;
-        $users = $userIdArray->groupBy('user_id')->pluck('user_id');
-        $potency = collect();
-        foreach ($users as $userId) {
-            $user = User::find($userId);
-            $sponsor = $user->sponsor;
-            $i = 1;
-            while ($i <= 10 && $sponsor) {
-                if ($sponsor->id == $this->id) {
-                    $percent = \App\Models\KeyValue::where('key', 'monthly_ro_unilevel_' . $i)->value('value');
-                    $userTransactions = clone $transactions;
-                    $userTransactions = $userTransactions->where('user_id', $userId)->get();
-                    foreach ($userTransactions as $ut) {
-                        $carts = '';
-                        foreach ($ut->carts as $key => $cart) {
-                            if ($key + 1 == $ut->carts()->count()) {
-                                if ($key == 0) {
-                                    $carts .= $cart->qty . ' ' . ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus') . ' (' . $cart->poin_total . ' poin)';
-                                } else {
-                                    $carts .= 'dan ' . $cart->qty . ' ' . ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus') . ' (' . $cart->poin_total . ' poin)';
-                                }
-                            } else {
-                                $carts .= $cart->qty . ' ' . ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus') . ' (' . $cart->poin_total . ' poin)' . ', ';
-                            }
-                        }
-                        $potency->push([
-                            'type' => 'Bonus Unilevel RO',
-                            'amount' => round($ut->poin * 1000 * $percent / 100),
-                            'description' => 'Bonus Unilevel RO dari belanja ' . $user->username . '. Belanja ' . $carts . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari ' . $ut->poin . ' poin.',
-                            'created_at' => $ut->created_at,
-                        ]);
-                    }
-                    break;
-                }
-                if (!$sponsor->member) {
-                    break;
-                }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
-                    $i++;
-                }
-                $sponsor = $sponsor->sponsor;
-            }
-        }
-        // transaction non member
-        $transactions = Transaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))
-            ->where('type', 'general')
-            ->where('poin', '>', 0)
-            ->whereNull('user_id')
-            ->whereNotNull('sponsor_id')
-            ->whereHas('carts', function ($q_cart) {
-                $q_cart->whereHas('product', function ($q_product) {
-                    $q_product->where('is_ro', true);
-                });
-            })
-            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-            ->latest();
-        $userIdArray = clone $transactions;
-        $users = $userIdArray->groupBy('sponsor_id')->pluck('sponsor_id');
-        foreach ($users as $userId) {
-            $user = User::find($userId);
-            $sponsor = $user->sponsor;
-            $i = 1;
-            while ($i <= 10 && $sponsor) {
-                if ($sponsor->id == $this->id) {
-                    $percent = \App\Models\KeyValue::where('key', 'monthly_ro_unilevel_' . $i)->value('value');
-                    $userTransactions = clone $transactions;
-                    $userTransactions = $userTransactions->where('sponsor_id', $userId)->get();
-                    foreach ($userTransactions as $ut) {
-                        $carts = '';
-                        foreach ($ut->carts as $key => $cart) {
-                            if ($key + 1 == $ut->carts()->count()) {
-                                if ($key == 0) {
-                                    $carts .= $cart->qty . ' ' . ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus') . ' (' . $cart->poin_total . ' poin)';
-                                } else {
-                                    $carts .= 'dan ' . $cart->qty . ' ' . ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus') . ' (' . $cart->poin_total . ' poin)';
-                                }
-                            } else {
-                                $carts .= $cart->qty . ' ' . ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus') . ' (' . $cart->poin_total . ' poin)' . ', ';
-                            }
-                        }
-                        $potency->push([
-                            'type' => 'Bonus Unilevel RO',
-                            'amount' => round($ut->poin * 1000 * $percent / 100),
-                            'description' => 'Bonus Unilevel RO dari belanja ' . $user->username . '. Belanja ' . $carts . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari ' . $ut->poin . ' poin.',
-                            'created_at' => $ut->created_at,
-                        ]);
-                    }
-                    break;
-                }
-                if (!$sponsor->member) {
-                    break;
-                }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
-                    $i++;
-                }
-                $sponsor = $sponsor->sponsor;
-            }
-        }
-        $ot = OfficialTransaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))->whereIn('status', ['paid', 'packed', 'shipped', 'received'])->latest();
-        $userIdArray = clone $ot;
-        $users = $userIdArray->groupBy('user_id')->pluck('user_id');
-        foreach ($users as $userId) {
-            $user = User::find($userId);
-            $sponsor = $user->sponsor;
-            $i = 1;
-            while ($i <= 10 && $sponsor) {
-                if ($sponsor->id == $this->id) {
-                    $percent = \App\Models\KeyValue::where('key', 'monthly_ro_unilevel_' . $i)->value('value');
-                    $userTransactions = clone $ot;
-                    $userTransactions = $userTransactions->where('user_id', $userId)->get();
-                    foreach ($userTransactions as $ut) {
-                        $potency->push([
-                            'type' => 'Bonus Unilevel RO',
-                            'amount' => round($ut->poin * 1000 * $percent / 100),
-                            'description' => 'Bonus Unilevel RO dari belanja official ' . $user->username . '. Belanja ' . $ut->qty . ' ' . ($ut->product->name ?? 'Produk telah dihapus') . ' (' . $ut->poin . ' poin)' . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari ' . $ut->poin . ' poin.',
-                            'created_at' => $ut->created_at,
-                        ]);
-                    }
-                    break;
-                }
-                if (!$sponsor->member) {
-                    break;
-                }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
-                    $i++;
-                }
-                $sponsor = $sponsor->sponsor;
-            }
-        }
-        $users = User::whereHas('userPin', function ($q) {
-            $q->whereHas('pin', function ($q_pin) {
-                $q_pin->whereIn('name', ['Gold', 'Basic Upgrade Gold', 'Silver Upgrade Gold', 'Platinum', 'Basic Upgrade Platinum', 'Silver Upgrade Platinum', 'Gold Upgrade Platinum']);
-            });
-        })->whereHas('dailyPoins', function ($q) use ($date) {
-            $q->where('pv', '>', 0);
-        })->get();
-        foreach ($users as $user) {
-            $sponsor = $user->sponsor;
-            $i = 1;
-            while ($i <= 10 && $sponsor) {
-                if ($sponsor->id == $this->id) {
-                    $percent = \App\Models\KeyValue::where('key', 'monthly_ro_unilevel_' . $i)->value('value');
-                    $dp = $user->dailyPoins()->where('pv', '>', 0)->whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))->latest()->get();
-                    foreach ($dp as $a) {
-                        $potency->push([
-                            'type' => 'Bonus Unilevel RO',
-                            'amount' => round($a->pv * 1000 * $percent / 100),
-                            'description' => 'Bonus Unilevel RO dari paket pin ' . $a->user->username . ' sejumlah ' . $a->pv . ' poin' . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari ' . $a->pv . ' poin.',
-                            'created_at' => $a->date,
-                        ]);
-                    }
-                    break;
-                }
-                if (!$sponsor->member) {
-                    break;
-                }
-                if ($sponsor->member->member_phase_name != 'User Free' && $sponsor->monthlyQualified($month)) {
-                    $i++;
-                }
-                $sponsor = $sponsor->sponsor;
-            }
-        }
-        return $potency;
+        return $this->userService()->monthlyPotency($this, $month);
     }
 
     public function officialTransactions()
@@ -582,120 +412,32 @@ class User extends Authenticatable
 
     public function referrals()
     {
-        $downlines = User::whereNull('id')->get();
-        $this->recursive($this, $downlines);
-        return $downlines;
+        return $this->userService()->referrals($this);
     }
 
     public function freeReferrals()
     {
-        $downlines = User::whereNull('id')->get();
-        $this->freeRecursive($this, $downlines);
-        return $downlines;
+        return $this->userService()->freeReferrals($this);
     }
 
     public function premiumReferrals()
     {
-        $downlines = User::whereNull('id')->get();
-        $this->premiumRecursive($this, $downlines);
-        return $downlines;
+        return $this->userService()->premiumReferrals($this);
     }
 
     public function agenReferrals()
     {
-        $downlines = User::whereNull('id')->get();
-        $this->agenRecursive($this, $downlines);
-        return $downlines;
+        return $this->userService()->agenReferrals($this);
     }
 
     public function distributorReferrals()
     {
-        $downlines = User::whereNull('id')->get();
-        $this->distributorRecursive($this, $downlines);
-        return $downlines;
+        return $this->userService()->distributorReferrals($this);
     }
-
-    function distributorRecursive($user, $downlines)
-    {
-        if ($user->sponsors) {
-            foreach ($user->sponsors as $a) {
-                if ($a->rank == 'Distributor') {
-                    $downlines->push($a);
-                }
-                $this->distributorRecursive($a, $downlines);
-            }
-        }
-        return;
-    }
-
-    function agenRecursive($user, $downlines)
-    {
-        if ($user->sponsors) {
-            foreach ($user->sponsors as $a) {
-                if ($a->rank == 'Agen') {
-                    $downlines->push($a);
-                }
-                $this->agenRecursive($a, $downlines);
-            }
-        }
-        return;
-    }
-
-    function premiumRecursive($user, $downlines)
-    {
-        if ($user->sponsors) {
-            foreach ($user->sponsors as $a) {
-                if ($a->premiumUserPin()->count()) {
-                    $downlines->push($a);
-                }
-                $this->premiumRecursive($a, $downlines);
-            }
-        }
-        return;
-    }
-
-    function freeRecursive($user, $downlines)
-    {
-        if ($user->sponsors) {
-            foreach ($user->sponsors as $a) {
-                if (!$a->premiumUserPin()->count()) {
-                    $downlines->push($a);
-                }
-                $this->freeRecursive($a, $downlines);
-            }
-        }
-        return;
-    }
-
-    function recursive($user, $downlines)
-    {
-        if ($user->sponsors) {
-            foreach ($user->sponsors as $a) {
-                $downlines->push($a);
-                $this->recursive($a, $downlines);
-            }
-        }
-        return;
-    }
-
-    public $level = 1;
 
     public function level($user)
     {
-        $this->digLevel($user);
-        return $this->level;
-    }
-
-    function digLevel($user)
-    {
-        if (!$user->sponsor_id) {
-            return 1;
-        }
-        if ($user->id == $this->id) {
-            return $this->level;
-        }
-        $this->level++;
-        $this->digLevel($user->sponsor);
+        return $this->userService()->level($this, $user);
     }
 
     public function member()
@@ -715,19 +457,7 @@ class User extends Authenticatable
 
     public function monthlyPoin($month)
     {
-        if (\App\Models\KeyValue::where('key', 'poin')->value('value') == 'enable') {
-            $userPoin = $this->userPoins()->whereYear('date', date('Y', strtotime($month)))->whereMonth('date', date('m', strtotime($month)))->first();
-            if ($userPoin) {
-                return $userPoin->poin;
-            }
-        }
-        // get ro poin from transaction
-        $t = $this->paidTransaction($month)->sum('poin');
-        // get ro poin from official transaction
-        $ot = $this->monthlyOfficial($month)->sum('poin');
-        // get ro poin from daily poin
-        $dp = $this->monthlyDailyPoins($month)->sum('pv');
-        return $t + $ot + $dp;
+        return $this->userService()->monthlyPoin($this, $month);
     }
 
     public function userPoins()
@@ -737,71 +467,12 @@ class User extends Authenticatable
 
     public function checkUsablePin(Pin $pin)
     {
-        if (!$this->userPin && $pin->type == 'premium') {
-            return true;
-        }
-        if (in_array($this->userPin->pin->name, ['Free Member', 'CR Reseller']) && $pin->type == 'premium') {
-            return true;
-        }
-        if (in_array($this->userPin->pin->name, ['Basic'])) {
-            if (in_array($pin->name, ['Basic Upgrade Silver', 'Basic Upgrade Gold', 'Basic Upgrade Platinum', 'Generasi', 'Generasi Up'])) {
-                return true;
-            }
-        }
-        if (in_array($this->userPin->pin->name, ['Silver', 'Basic Upgrade Silver', 'Generasi', 'Generasi Up'])) {
-            if (in_array($pin->name, ['Silver Upgrade Gold', 'Silver Upgrade Platinum'])) {
-                return true;
-            }
-        }
-        if (in_array($this->userPin->pin->name, ['Gold', 'Basic Upgrade Gold', 'Silver Upgrade Gold'])) {
-            if (in_array($pin->name, ['Gold Upgrade Platinum'])) {
-                return true;
-            }
-        }
-        if (!$this->userPins()->whereIn('name', ['Generasi', 'Generasi Up'])->count()) {
-            if (in_array($pin->name, ['Generasi', 'Generasi Up'])) {
-                return true;
-            }
-        }
-        if (!$this->userPins()->where('name', 'like', '%BSM%')->count()) {
-            if (str_contains($pin->name, 'BSM')) {
-                return true;
-            }
-        }
-        $bsm34 = ['BSM GOLD', 'BSM PLATINUM', 'BSM GOLD UP', 'BSM PLATINUM UP', 'BSM GOLD Automaintain'];
-        if (!$this->userPins()->whereIn('name', $bsm34)->count()) {
-            if (str_contains($pin->name, 'BSM')) {
-                return true;
-            }
-        }
-        if ($this->userPins()->whereIn('name', $bsm34)->count()) {
-            if (str_contains($pin->name, 'PIN PAKET RO')) {
-                return true;
-            }
-        }
-        return false;
+        return $this->userService()->checkUsablePin($this, $pin);
     }
 
     public function color()
     {
-        $color = 'white';
-        switch ($this->userPin?->pin->name_short) {
-            case 'Basic':
-                $color = 'dark';
-                break;
-            case 'Silver':
-                $color = 'muted';
-                break;
-            case 'Gold':
-                $color = 'warning';
-                break;
-            case 'Platinum':
-                $color = 'danger';
-                break;
-            default:
-                break;
-        }
-        return $color;
+        return $this->userService()->color($this);
     }
 
     // check upgradeable
@@ -896,10 +567,7 @@ class User extends Authenticatable
 
     public function isWeekActive($week)
     {
-        if ($this->userPin?->pin->level > 2 && $this->activeWeeks()->where('week', $week)->count()) {
-            return true;
-        }
-        return false;
+        return $this->userService()->isWeekActive($this, $week);
     }
 
     public function activeWeeks()
@@ -935,13 +603,12 @@ class User extends Authenticatable
 
     public function isMonoleg()
     {
-        return $this->userPins()->where('name', 'like', '%BSM%')->count();
+        return $this->userService()->isMonoleg($this);
     }
+
     public function monolegSponsors()
     {
-        return $this->sponsors()->whereHas('userPins', function ($q) {
-            $q->where('name', 'like', '%BSM%');
-        });
+        return $this->uplines();
     }
 
     public function daily($date)
@@ -963,9 +630,7 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserPin::class)->ofMany([
             'level' => 'max',
-        ], function ($q) {
-            $q->where('name', 'like', '%BSM%');
-        });
+        ]);
     }
 
     public function automaintains()
@@ -980,12 +645,7 @@ class User extends Authenticatable
 
     public function isAlreadyAutomaintain($month)
     {
-        $date = DateTime::createFromFormat('Y-m', $month);
-        return $this->userPins()->whereIn('name', ['PIN PAKET RO', 'BSM GOLD Automaintain'])
-            ->where('is_used', true)
-            ->whereYear('created_at', $date->format('Y'))
-            ->whereMonth('created_at', $date->format('m'))
-            ->count();
+        return $this->userService()->isAlreadyAutomaintain($this, $month);
     }
 
     public function userAwards()

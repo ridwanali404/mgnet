@@ -14,11 +14,66 @@ class ApiController extends Controller
             return [];
         }
         
+        // Jangan tampilkan monoleg untuk user admin
+        if ($user->type == 'admin') {
+            return [];
+        }
+        
         $tree = [];
         $pinName = '-';
         
-        // Cek apakah user punya monolegUserPin (pin BSM) atau premiumUserPin (Gold/Platinum)
-        if ($user->monolegUserPin) {
+        // Cek apakah user punya premiumUserPin (Gold/Platinum) atau monolegUserPin (pin BSM)
+        // Prioritaskan premiumUserPin jika user memiliki keduanya
+        if ($user->premiumUserPin) {
+            // Sistem monoleg Gold/Platinum (baru) - tampilkan leg kiri dan jalur monoleg
+            // Menggunakan uplines (berdasarkan upline_id) bukan sponsors (berdasarkan sponsor_id)
+            $pinName = $user->premiumUserPin->pin->name_short ?? '-';
+            $tree[] = [
+                [
+                    'v' => (string) $user->id,
+                    'f' => $user->username . '<div>' . $pinName . '</div>',
+                ],
+                '',
+                ''
+            ];
+            
+            // Ambil semua uplines berdasarkan urutan created_at (downline berdasarkan upline_id)
+            $allUplines = $user->uplines()->whereHas('premiumUserPin')->orderBy('created_at', 'asc')->get();
+            
+            if ($allUplines->count() > 0) {
+                // Upline pertama = leg kiri
+                $firstUpline = $allUplines->first();
+                $tree[] = [
+                    [
+                        'v' => (string) $firstUpline->id,
+                        'f' => $firstUpline->username . '<div>' . ($firstUpline->premiumUserPin ? $firstUpline->premiumUserPin->pin->name_short : '-') . '<div style="color:red;">Leg Kiri</div>'
+                    ],
+                    (string) $user->id,
+                    ''
+                ];
+                
+                // Recursive untuk Leg Kiri (tampilkan semua downline sampai 10 level)
+                // Untuk Leg Kiri, kita tidak perlu legNumber karena ini adalah leg kiri utama
+                $this->addMonolegDownlineForLeftLeg($firstUpline, $user->id, $tree, 0, 10);
+                
+                // Upline kedua dan seterusnya = Leg 1, Leg 2, Leg 3, dst (jalur monoleg)
+                $monolegUplines = $allUplines->skip(1)->values();
+                foreach ($monolegUplines as $key => $monolegUpline) {
+                    $legNumber = $key + 1;
+                    $tree[] = [
+                        [
+                            'v' => (string) $monolegUpline->id,
+                            'f' => $monolegUpline->username . '<div>' . ($monolegUpline->premiumUserPin ? $monolegUpline->premiumUserPin->pin->name_short : '-') . '<div style="color:green;">Leg ' . $legNumber . '</div>'
+                        ],
+                        (string) $user->id,
+                        ''
+                    ];
+                    
+                    // Recursive untuk downline di jalur monoleg (level dimulai dari 2)
+                    $this->addMonolegDownline($monolegUpline, $user->id, $tree, (string)$legNumber, 2, 10);
+                }
+            }
+        } elseif ($user->monolegUserPin) {
             // Sistem monoleg BSM (lama)
             $pinName = $user->monolegUserPin->pin->name_short ?? '-';
             $tree[] = [
@@ -55,52 +110,6 @@ class ApiController extends Controller
                     }
                 }
             }
-        } elseif ($user->premiumUserPin) {
-            // Sistem monoleg Gold/Platinum (baru) - tampilkan leg kanan
-            $pinName = $user->premiumUserPin->pin->name_short ?? '-';
-            $tree[] = [
-                [
-                    'v' => (string) $user->id,
-                    'f' => $user->username . '<div>' . $pinName . '</div>',
-                ],
-                '',
-                ''
-            ];
-            
-            // Ambil semua sponsors (kiri dan kanan)
-            $allSponsors = $user->sponsors()->whereHas('premiumUserPin')->orderBy('created_at', 'asc')->get();
-            
-            // Pisahkan kiri dan kanan
-            $leftSponsors = $allSponsors->where('placement_side', 'left');
-            $rightSponsors = $allSponsors->where('placement_side', 'right');
-            
-            // Tampilkan sponsor pertama di kiri (jika ada)
-            if ($leftSponsors->count() > 0) {
-                $firstLeft = $leftSponsors->first();
-                $tree[] = [
-                    [
-                        'v' => (string) $firstLeft->id,
-                        'f' => $firstLeft->username . '<div>' . ($firstLeft->premiumUserPin ? $firstLeft->premiumUserPin->pin->name_short : '-') . '<div style="color:red;">Leg Kiri</div>'
-                    ],
-                    (string) $user->id,
-                    ''
-                ];
-            }
-            
-            // Tampilkan semua di leg kanan (monoleg)
-            foreach ($rightSponsors as $key => $rightSponsor) {
-                $tree[] = [
-                    [
-                        'v' => (string) $rightSponsor->id,
-                        'f' => $rightSponsor->username . '<div>' . ($rightSponsor->premiumUserPin ? $rightSponsor->premiumUserPin->pin->name_short : '-') . '<div style="color:green;">Leg Kanan ' . ($key + 1) . '</div>'
-                    ],
-                    (string) $user->id,
-                    ''
-                ];
-                
-                // Recursive untuk downline di leg kanan
-                $this->addMonolegDownline($rightSponsor, $user->id, $tree);
-            }
         } else {
             // User tidak punya pin premium atau BSM
             return [];
@@ -110,28 +119,50 @@ class ApiController extends Controller
     }
     
     /**
-     * Tambahkan downline di leg kanan secara recursive
+     * Tambahkan downline di jalur monoleg secara recursive
+     * Menggunakan uplines (berdasarkan upline_id) bukan sponsors (berdasarkan sponsor_id)
+     * Hanya tampilkan downline pertama (Leg Kiri/lanjutan monoleg) tanpa leg baru
+     * Recursive sampai 10 level ke bawah
+     * Level dimulai dari 2 (karena level 1 adalah Leg 1, Leg 2, dst)
      */
-    private function addMonolegDownline($user, $rootId, &$tree)
+    private function addMonolegDownline($user, $rootId, &$tree, $legNumber = '1', $level = 2, $maxLevel = 10)
     {
-        $downlines = $user->sponsors()
+        // Batasi sampai 10 level
+        if ($level > $maxLevel) {
+            return;
+        }
+        
+        // Gunakan uplines (berdasarkan upline_id) bukan sponsors
+        $downlines = $user->uplines()
             ->whereHas('premiumUserPin')
-            ->where('placement_side', 'right')
             ->orderBy('created_at', 'asc')
             ->get();
         
-        foreach ($downlines as $downline) {
+        if ($downlines->count() > 0) {
+            // Hanya tampilkan downline pertama = Leg Kiri (lanjutan monoleg ke bawah)
+            // Tidak tampilkan downline kedua dan seterusnya
+            $firstDownline = $downlines->first();
             $tree[] = [
                 [
-                    'v' => (string) $downline->id,
-                    'f' => $downline->username . '<div>' . ($downline->premiumUserPin ? $downline->premiumUserPin->pin->name_short : '-') . '<div style="color:green;">Leg Kanan</div>'
+                    'v' => (string) $firstDownline->id,
+                    'f' => $firstDownline->username . '<div>' . ($firstDownline->premiumUserPin ? $firstDownline->premiumUserPin->pin->name_short : '-') . '<div style="color:green;">Monoleg Level ' . $level . '</div>'
                 ],
-                (string) $downline->sponsor_id,
+                (string) $firstDownline->upline_id,
                 ''
             ];
             
-            // Recursive untuk downline berikutnya
-            $this->addMonolegDownline($downline, $rootId, $tree);
+            // Recursive untuk lanjutan monoleg ke bawah dengan level + 1
+            $this->addMonolegDownline($firstDownline, $rootId, $tree, $legNumber, $level + 1, $maxLevel);
         }
+    }
+    
+    /**
+     * Tambahkan downline untuk Leg Kiri secara recursive
+     * Leg Kiri tidak menampilkan downline apapun (hanya tampil sendiri)
+     */
+    private function addMonolegDownlineForLeftLeg($user, $rootId, &$tree, $level = 0, $maxLevel = 10)
+    {
+        // Leg Kiri tidak menampilkan downline apapun
+        return;
     }
 }

@@ -18,7 +18,9 @@
 @endsection
 @php
     $cash = auth()->user()->cash_automaintain;
-    $claim = floor($cash / 2000000);
+    // Automaintain limit adalah 1,7 juta (bukan 2 juta)
+    $automaintainLimit = 1700000;
+    $claim = floor($cash / $automaintainLimit);
 @endphp
 @section('content')
     <div class="container-fluid">
@@ -37,6 +39,15 @@
                 </div>
             </div>
         </div>
+        @if (auth()->user()->type != 'admin')
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted">
+                        <strong>Automaintain</strong> Batasnya Bukan 2 juta tapi Rp 1,7 juta. Ketika terjadi Automaintain tercapai 1,7 juta, Bonus naik ke Uplinenya seperti ketika jika Dia mensponsori Gold..Hanya intinya tanpa Bonus Sponsor Saja.. jadi RO bisa lewat belanja, Maupun lewat Automaintain. Sama sih sistem ini kayak di BSM sebelumnya.
+                    </p>
+                </div>
+            </div>
+        @endif
         @if (auth()->user()->type == 'admin')
             @foreach ($topups as $a)
                 @if (!$a->confirm_at)
@@ -143,11 +154,11 @@
                     <div class="card">
                         <div class="card-body">
                             <h3 class="m-b-15">
-                                Rp {{ number_format($cash, 0, ',', '.') }} / <small class="text-muted">Rp 2.000.000</small>
+                                Rp {{ number_format($cash, 0, ',', '.') }} / <small class="text-muted">Rp 1.700.000</small>
                             </h3>
                             <div class="progress">
                                 <div id="bar-volume" class="progress-bar bg-danger" role="progressbar"
-                                    style="width: {{ round(($cash / 2000000) * 100) }}%; height: 6px;" aria-valuenow="25"
+                                    style="width: {{ round(($cash / $automaintainLimit) * 100) }}%; height: 6px;" aria-valuenow="25"
                                     aria-valuemin="0" aria-valuemax="100">
                                 </div>
                             </div>
@@ -214,7 +225,7 @@
                                     <div class="form-group">
                                         <label>Nominal</label>
                                         <input type="number" class="form-control" name="amount"
-                                            value="{{ $cash >= 2000000 ? 0 : 2000000 - $cash }}" min="1" readonly
+                                            value="{{ $cash >= $automaintainLimit ? 0 : $automaintainLimit - $cash }}" min="1" readonly
                                             required>
                                     </div>
                                 </div>

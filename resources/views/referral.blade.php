@@ -60,7 +60,7 @@
         <div class="card">
             <div class="card-body">
                 @if (!request()->get('query'))
-                    <button class="float-right btn btn-sm btn-rounded btn-danger disabled">Level
+                    <button class="float-right btn btn-sm btn-rounded btn-danger disabled">Generasi
                         {{ Auth::user()->level($user) }}</button>
                 @endif
                 <h4 class="card-title">Referral</h4>

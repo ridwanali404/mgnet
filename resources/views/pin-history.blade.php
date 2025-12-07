@@ -183,7 +183,7 @@
                                             <tr>
                                                 <td>{{ $loop->index + 1 }}</td>
                                                 <td><code>{{ $a->created_at }}</code></td>
-                                                <td><code>CR-{{ strtoupper($a->code) }}</code></td>
+                                                <td><code>MG-{{ strtoupper($a->code) }}</code></td>
                                                 <td>{{ $a->pin->name }}</td>
                                                 <td>
                                                     @if (!$a->user)

@@ -263,9 +263,10 @@ trait Helper
         // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM) - DIBUAT HARIAN (dibayar langsung saat upgrade)
         if (!str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
             $sponsor = $user->sponsor;
-            // Syarat: sponsor harus memiliki 1 sponsor langsung
-            if ($sponsor && $sponsor->sponsors()->whereHas('premiumUserPin')->count() >= 1) {
-                // Cari monoleg (leg kanan) - unlimited depth
+            // Syarat: sponsor harus memiliki minimal 1 downline langsung (berdasarkan upline_id)
+            if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
+                // Cari monoleg (jalur monoleg, bukan Leg Kiri) - unlimited depth
+                // Leg Kiri tidak dihitung sebagai monoleg, hanya Leg 1, Leg 2, dst
                 $monoleg = Helper::findMonolegRecursive($sponsor, $user);
                 if ($monoleg) {
                     $amount = round($pin->price * $pin->monoleg_percent / 100);
@@ -369,33 +370,41 @@ trait Helper
     }
 
     /**
-     * Mencari monoleg (leg kanan) secara recursive untuk bonus monoleg
-     * Leg kanan = sponsor yang ditempatkan di sisi kanan
-     * Bonus monoleg diberikan ke upline yang memiliki leg kanan
+     * Mencari monoleg (jalur monoleg) secara recursive untuk bonus monoleg
+     * Menggunakan uplines (berdasarkan upline_id) bukan sponsors (berdasarkan sponsor_id)
+     * Jalur monoleg = downline kedua dan seterusnya (bukan downline pertama/Leg Kiri)
+     * Bonus monoleg diberikan ke upline yang memiliki jalur monoleg
+     * Leg Kiri tidak dihitung sebagai monoleg, hanya Leg 1, Leg 2, dst
+     * 
+     * Catatan: Bonus monoleg hanya untuk downline langsung dari jalur monoleg,
+     * bukan untuk downline dari downline tersebut (hanya 1 level)
      */
     public static function findMonolegRecursive($sponsor, $currentUser)
     {
-        // Cari sponsor langsung yang ditempatkan di kanan
-        $rightLeg = $sponsor->sponsors()->where('placement_side', 'right')
+        // Ambil semua downline langsung berdasarkan upline_id yang punya premium pin, urutkan berdasarkan created_at
+        $allUplines = $sponsor->uplines()
             ->whereHas('premiumUserPin')
             ->orderBy('created_at', 'asc')
-            ->first();
+            ->get();
         
-        if ($rightLeg) {
-            // Jika current user adalah di bawah right leg, return sponsor (upline dari right leg)
-            if ($currentUser->sponsor_id == $rightLeg->id) {
-                return $sponsor;
-            }
-            // Jika current user masih di bawah right leg, lanjutkan recursive
-            $found = Helper::findMonolegRecursive($rightLeg, $currentUser);
-            if ($found) {
-                return $found;
-            }
+        if ($allUplines->count() < 2) {
+            // Sponsor harus punya minimal 2 downline langsung untuk memiliki jalur monoleg
+            return null;
         }
         
-        // Jika current user langsung di bawah sponsor dan tidak ada right leg sebelumnya, return sponsor
-        if ($currentUser->sponsor_id == $sponsor->id && $currentUser->placement_side == 'right') {
-            return $sponsor;
+        // Downline pertama = Leg Kiri (tidak dihitung sebagai monoleg, tidak dapat bonus)
+        // Downline kedua dan seterusnya = jalur monoleg (Leg 1, Leg 2, dst) - dapat bonus
+        $monolegUplines = $allUplines->skip(1)->values();
+        
+        // Cek apakah current user adalah downline langsung dari sponsor di jalur monoleg
+        // Bonus monoleg hanya untuk downline langsung dari sponsor, bukan downline dari downline
+        foreach ($monolegUplines as $monolegUpline) {
+            // Jika current user langsung di bawah sponsor di jalur monoleg (upline_id = sponsor->id), return sponsor
+            // Catatan: monolegUpline adalah downline langsung dari sponsor di jalur monoleg
+            // Jadi kita cek apakah currentUser adalah monolegUpline itu sendiri (downline langsung dari sponsor)
+            if ($currentUser->id == $monolegUpline->id) {
+                return $sponsor;
+            }
         }
         
         return null;
@@ -701,7 +710,8 @@ trait Helper
             'description' => $description,
         ]);
         // use automaintain
-        if ($user->cash_automaintain >= 2000000) {
+        // Batas automaintain adalah 1,7 juta (bukan 2 juta)
+        if ($user->cash_automaintain >= 1700000) {
             $is_already_automaintain = $user->isAlreadyAutomaintain(date('Y-m'));
             if (!$is_already_automaintain) {
                 Helper::ro($user);
@@ -736,10 +746,11 @@ trait Helper
             }
             $description = 'Penggunaan ' . $pin->name . '.';
         }
-        $user->decrement('cash_automaintain', 2000000);
+        // Automaintain limit adalah 1,7 juta (bukan 2 juta)
+        $user->decrement('cash_automaintain', 1700000);
         $user->automaintains()->create([
             'type' => 'D',
-            'amount' => 2000000,
+            'amount' => 1700000,
             'current' => $user->cash_automaintain,
             'description' => $description,
         ]);

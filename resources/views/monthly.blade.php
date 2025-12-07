@@ -152,6 +152,11 @@
                                     <small>PV</small>
                                 </div>
                             </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    Setiap produk tetap ada PV satuan retail, Fungsinya hanya untuk menjadi kumpulan PV poin, Ketika Mencapai 170 PV, Maka dia Sudah seperti RO teraktivasi, dan Bonus Naik ke uplinenya seperti paket Join Gold Hanya Tanpa Bonus Sponsor
+                                </small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -929,6 +934,83 @@
                             </div>
                         </div>
                     </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Bonus Total Global Profit Sharing <span
+                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
+                            <h6 class="card-subtitle">Total bonus profit sharing untuk Platinum (dengan historis harian detailnya)</h6>
+                            <div class="table-responsive">
+                                <table id="monthly-profit-sharing"
+                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
+                                    width="100%">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Tanggal</th>
+                                            <th class="text-right">Bonus (Rp)</th>
+                                            <th>Deskripsi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (Auth::user()->monthlyProfitSharingBonuses($month)->latest()->get() as $a)
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
+                                                <td><code>{{ $a->created_at }}</code></td>
+                                                <td class="text-right">
+                                                    <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
+                                                </td>
+                                                <td>{{ $a->description }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Bonus Power Plus <span
+                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
+                            <h6 class="card-subtitle">Bonus Power Plus untuk yang Qualified</h6>
+                            <div class="table-responsive">
+                                <table id="monthly-power-plus"
+                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
+                                    width="100%">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Tanggal</th>
+                                            <th class="text-right">Bonus (Rp)</th>
+                                            <th>Deskripsi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (Auth::user()->monthlyPowerPlusBonuses($month)->latest()->get() as $a)
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
+                                                <td><code>{{ $a->created_at }}</code></td>
+                                                <td class="text-right">
+                                                    <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
+                                                </td>
+                                                <td>{{ $a->description }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Bonus Bulanan bagian Statement Bonus Ini nanti isinya :</h4>
+                            <ol>
+                                <li>Komisi Penjualan (seperti biasa selisih harga jual beli)</li>
+                                <li>Bonus Total Global Profit Sharing (Bagi yang Platinum), tapi diberikan juga Historis Harian detailnya</li>
+                                <li>Bonus Power Plus (Bagi Yang Qualified)</li>
+                                <li>Untuk Bonus Cash Reward Trip dibuatkan di menu Reward saja tersendiri semacam menu Automaintain, yang ada info masukan bonus setiap hari Bagi yang Qualified. Dan ada tombol Ajuan Klaim Ketika Mencapai posisi Nominal tertentu yang kita Atur dari Admin jenjangnya.</li>
+                            </ol>
+                        </div>
+                    </div>
                 @endif
             </div>
         </div>
@@ -1276,6 +1358,30 @@
                     },
                 });
                 $('#monthly-cashback').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    order: [
+                        [1, "desc"]
+                    ],
+                    language: {
+                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    },
+                });
+                $('#monthly-profit-sharing').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    order: [
+                        [1, "desc"]
+                    ],
+                    language: {
+                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    },
+                });
+                $('#monthly-power-plus').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
                         'copy', 'csv', 'excel', 'pdf', 'print'
