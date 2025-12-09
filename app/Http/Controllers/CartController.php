@@ -148,7 +148,6 @@ class CartController extends Controller
             }
             if (!Auth::user()->address) {
                 Session::flash('fail', 'Silahkan lengkapi alamat Anda');
-                return redirect(url('plan-a') . '?redirect=' . env('CR_URL') . '/member/profile');
                 return redirect('account');
             } else if (!Auth::user()->address->subdistrict_id) {
                 Session::flash('fail', 'Silahkan lengkapi alamat Anda');

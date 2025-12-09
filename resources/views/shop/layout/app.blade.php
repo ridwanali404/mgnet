@@ -88,7 +88,7 @@
                         </div>
 
                         <div class="col-12">
-                            <a href="{{ env('CR_URL') }}/reset-password" class="float-end text-dark fw-light mt-2">Lupa
+                            <a href="{{ url('/') }}" class="float-end text-dark fw-light mt-2">Lupa
                                 Password?</a>
                         </div>
 
@@ -339,12 +339,12 @@
                                 @if (Auth::guest())
                                     @if (request()->sponsor)
                                         <li class="menu-item"><a class="menu-link"
-                                                href="{{ env('CR_URL') . '/r/' . request()->sponsor }}">
+                                                href="{{ url('/register') . '?sponsor=' . request()->sponsor }}">
                                                 <div>Daftar Sekarang</div>
                                             </a></li>
                                     @elseif(isset($_COOKIE['sponsor']))
                                         <li class="menu-item"><a class="menu-link"
-                                                href="{{ env('CR_URL') . '/r/' . $_COOKIE['sponsor'] }}">
+                                                href="{{ url('/register') . '?sponsor=' . $_COOKIE['sponsor'] }}">
                                                 <div>Daftar Sekarang</div>
                                             </a></li>
                                     @endif
@@ -411,11 +411,11 @@
                                         Sekarang</a>
                                 @else
                                     @if (request()->sponsor)
-                                        <a href="{{ env('CR_URL') . '/r/' . request()->sponsor }}"
+                                        <a href="{{ url('/register') . '?sponsor=' . request()->sponsor }}"
                                             class="button bg-white text-dark button-light">Daftar
                                             Sekarang</a>
                                     @elseif(isset($_COOKIE['sponsor']))
-                                        <a href="{{ env('CR_URL') . '/r/' . $_COOKIE['sponsor'] }}"
+                                        <a href="{{ url('/register') . '?sponsor=' . $_COOKIE['sponsor'] }}"
                                             class="button bg-white text-dark button-light">Daftar
                                             Sekarang</a>
                                     @endif
@@ -660,7 +660,7 @@
                                         <small>
                                             @if (!Auth::user()->member->member_pin)
                                                 Maaf, Anda belum membuat Pin Stokis. Silahkan <a
-                                                    href="{{ url('plan-a') }}?redirect={{ env('CR_URL') }}/member/profile">buat
+                                                    href="{{ url('account') }}">buat
                                                     Pin Stokis</a> terlebih dulu.
                                             @else
                                                 Semua transaksi yang dibuat dalam Mode Stokis akan menjadi stok. Harga

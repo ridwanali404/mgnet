@@ -163,9 +163,17 @@ trait Helper
 
         // Bonus Generasi 19% - DIBUAT HARIAN (dibayar langsung saat upgrade)
         $sponsor = $user->sponsor;
-        if ($pin->is_generasi && $pin->price && $pin->generasi_percent > 0) {
+        
+        // Untuk upgrade Gold ke Platinum, hitung bonus generasi berdasarkan paket Platinum
+        $targetPin = $pin;
+        if ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) {
+            // Cari paket Platinum untuk menghitung bonus generasi
+            $targetPin = Pin::where('name', 'Platinum')->where('type', 'premium')->first();
+        }
+        
+        if ($targetPin && $targetPin->is_generasi && $targetPin->price && $targetPin->generasi_percent > 0) {
             // Hitung total alokasi bonus generasi (19% dari harga paket)
-            $totalAllocation = round($pin->price * $pin->generasi_percent / 100);
+            $totalAllocation = round($targetPin->price * $targetPin->generasi_percent / 100);
             
             // Distribusi persentase per generasi: 25%, kemudian turun sampai 3%
             // Generasi 1: 25%, 2: 20%, 3: 15%, 4: 12%, 5: 10%, 6: 8%, 7: 6%, 8: 5%, 9: 4%, 10: 3%
@@ -184,21 +192,43 @@ trait Helper
                     $sponsorPin = $sponsor->premiumUserPin->pin;
                     
                     // Push-up mechanism: Jika di bawah Gold terdapat Platinum, selisih naik ke upline Platinum
-                    if ($sponsorPin->name == 'Gold' && $pin->name == 'Platinum') {
+                    // Juga berlaku untuk upgrade Gold ke Platinum
+                    if ($sponsorPin->name == 'Gold' && ($pin->name == 'Platinum' || ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')))) {
                         // Cari upline Platinum terdekat di atas Gold ini
                         $platinumUpline = Helper::findPlatinumUpline($sponsor);
                         if ($platinumUpline) {
-                            // Push-up: bonus Platinum diberikan ke upline Platinum, bukan ke Gold
-                            $percent = $generasiPercentages[$i - 1] ?? 0;
-                            $amount = round($totalAllocation * $percent / 100);
-                            
-                            if ($amount > 0) {
-                                $bonus = $platinumUpline->bonuses()->create([
-                                    'type' => 'Bonus Generasi',
-                                    'amount' => $amount,
-                                    'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
-                                ]);
-                                Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                            // Hitung bonus Gold yang seharusnya didapat oleh Gold sponsor
+                            $goldPin = Pin::where('name', 'Gold')->first();
+                            if ($goldPin && $goldPin->price && $goldPin->generasi_percent > 0) {
+                                $goldAllocation = round($goldPin->price * $goldPin->generasi_percent / 100);
+                                $percent = $generasiPercentages[$i - 1] ?? 0;
+                                $goldAmount = round($goldAllocation * $percent / 100);
+                                
+                                // Berikan bonus Gold ke Gold sponsor
+                                if ($goldAmount > 0) {
+                                    $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                    $goldBonus = $sponsor->bonuses()->create([
+                                        'type' => 'Bonus Generasi',
+                                        'amount' => $goldAmount,
+                                        'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').',
+                                    ]);
+                                    Helper::automaintain($sponsor, 'K', $goldBonus->amount, 'Saldo automaintain dari ' . $goldBonus->description);
+                                }
+                                
+                                // Hitung bonus Platinum dan selisihnya
+                                $platinumAmount = round($totalAllocation * $percent / 100);
+                                $differenceAmount = $platinumAmount - $goldAmount;
+                                
+                                // Berikan selisih ke Platinum upline
+                                if ($differenceAmount > 0) {
+                                    $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                    $bonus = $platinumUpline->bonuses()->create([
+                                        'type' => 'Bonus Generasi',
+                                        'amount' => $differenceAmount,
+                                        'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                    ]);
+                                    Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                                }
                             }
                             // Skip Gold ini, lanjut ke sponsor berikutnya
                             $sponsor = $sponsor->sponsor;
@@ -246,10 +276,11 @@ trait Helper
                         $amount = round($totalAllocation * $percent / 100);
                         
                         if ($amount > 0) {
+                            $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                             $bonus = $sponsor->bonuses()->create([
                                 'type' => 'Bonus Generasi',
                                 'amount' => $amount,
-                                'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                             ]);
                             Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                         }
@@ -272,7 +303,7 @@ trait Helper
                     $amount = round($pin->price * $pin->monoleg_percent / 100);
                     if ($amount > 0) {
                         $bonus = $monoleg->bonuses()->create([
-                            'type' => 'Bonus Monoleg',
+                            'type' => 'Komisi Monoleg',
                             'amount' => $amount,
                             'description' => 'Bonus Monoleg 9% dari upgrade ' . $user->username . ' paket ' . $pin->name . '.',
                         ]);

@@ -58,12 +58,6 @@ class AuthController extends Controller
             if (env('IS_PLAN_A')) {
                 return redirect('plana/dashboard');
             }
-            if (env('CR_URL')) {
-                if (in_array(Auth::user()->userPin->name, ['Free Member', 'CR Reseller', 'Basic'])) {
-                    return redirect('plan-a');
-                }
-                return redirect('home');
-            }
             return redirect()->route('index');
         } else {
             Session::flash('fail', 'Silahkan periksa kembali username atau password Anda');
@@ -78,12 +72,6 @@ class AuthController extends Controller
         Session::flash('success', 'Silahkan login kembali');
         if (request()->redirect) {
             return redirect(request()->redirect);
-        }
-        if (env('CR_URL')) {
-            if (env('CR_ID_REDIRECT')) {
-                return redirect(env('CR_URL') . '/member/logout?redirect=' . env('CR_ID_REDIRECT'));
-            }
-            return redirect(env('CR_URL') . '/member/logout?redirect=' . env('APP_URL'));
         }
         return redirect('/');
     }
@@ -165,12 +153,7 @@ class AuthController extends Controller
     {
         Auth::logout();
         Session::flush();
-        if (env('CR_ID_REDIRECT')) {
-            if (url('') != env('CR_ID_REDIRECT')) {
-                return redirect(env('CR_ID_REDIRECT') . '/logout?redirect=' . env('CR_URL') . '/login');
-            }
-        }
-        return redirect(env('CR_URL') . '/login');
+        return redirect('/');
     }
 
     // public function stockist(Request $request)

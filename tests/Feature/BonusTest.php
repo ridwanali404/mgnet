@@ -295,7 +295,7 @@ class BonusTest extends TestCase
 
         // Check bonus monoleg
         $bonus = Bonus::where('user_id', $sponsor->id)
-            ->where('type', 'Bonus Monoleg')
+            ->where('type', 'Komisi Monoleg')
             ->first();
 
         $this->assertNotNull($bonus);

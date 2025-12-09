@@ -210,23 +210,23 @@ class HomeController extends Controller
         dd('success');
     }
 
-    public function planA()
-    {
-        $response = Http::asForm()->post(env('CR_URL') . '/api/member/login', [
-            'username' => Auth::user()->username,
-            'password' => Auth::user()->member->member_password ?? Auth::user()->password,
-            // 'password' => '$2y$10$bb6LJPT8x9jsXRrKljf7heOgv9aBV6V0VbjE/klHmoX5fdpzUylu2', // 1234
-        ]);
-        if ($response->successful()) {
-            $sso_url = $response->json()['data']['sso_url'];
-            if (request()->redirect) {
-                return redirect($sso_url . '?redirect=' . request()->redirect);
-            }
-            return redirect($sso_url);
-        }
-        Session::flash('fail', 'Terjadi kesalahan saat masuk ke Plan A');
-        return back();
-    }
+    // Function planA() sudah tidak digunakan - CR_URL sudah tidak digunakan
+    // public function planA()
+    // {
+    //     $response = Http::asForm()->post(env('CR_URL') . '/api/member/login', [
+    //         'username' => Auth::user()->username,
+    //         'password' => Auth::user()->member->member_password ?? Auth::user()->password,
+    //     ]);
+    //     if ($response->successful()) {
+    //         $sso_url = $response->json()['data']['sso_url'];
+    //         if (request()->redirect) {
+    //             return redirect($sso_url . '?redirect=' . request()->redirect);
+    //         }
+    //         return redirect($sso_url);
+    //     }
+    //     Session::flash('fail', 'Terjadi kesalahan saat masuk ke Plan A');
+    //     return back();
+    // }
 
     public function profitSharing13()
     {

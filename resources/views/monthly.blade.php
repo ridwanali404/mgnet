@@ -759,6 +759,8 @@
                                     </code>
                                 </td>
                             </tr>
+                            {{-- Bonus Unilevel RO dan Bonus Bulanan Poin Sharing 13% sudah dihilangkan --}}
+                            {{-- 
                             <tr>
                                 <td>
                                     Bonus Unilevel RO <span class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span>
@@ -796,6 +798,7 @@
                                     </code>
                                 </td>
                             </tr>
+                            --}}
                             <tr>
                                 <td><b>Jumlah</b></td>
                                 <td class="text-right font-weight-bold">
@@ -877,6 +880,8 @@
                             </div>
                         </div>
                     </div>
+                    {{-- Bonus Unilevel RO dan Bonus Bulanan Poin Sharing 13% sudah dihilangkan --}}
+                    {{-- 
                     <div class="card">
                         <div class="card-body">
                             <h4 class="card-title">Bonus Unilevel RO <span
@@ -934,6 +939,7 @@
                             </div>
                         </div>
                     </div>
+                    --}}
                     <div class="card">
                         <div class="card-body">
                             <h4 class="card-title">Bonus Total Global Profit Sharing <span

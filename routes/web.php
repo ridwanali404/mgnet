@@ -97,7 +97,8 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('account', 'UserController@account');
     Route::get('hirearchy/{username}/{phase}', 'HomeController@phase');
     Route::get('hirearchy', 'HomeController@tree');
-    Route::get('plan-a', 'HomeController@planA');
+    // Route plan-a sudah tidak digunakan - CR_URL sudah tidak digunakan
+    // Route::get('plan-a', 'HomeController@planA');
 
     Route::group(['prefix' => 'admin'], function () {
         Route::get('transaction/general', 'TransactionController@general')->name('admin.transaction.general');
