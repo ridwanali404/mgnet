@@ -252,7 +252,7 @@
                 };
                 $.post('{{ url('courier') }}', input, function(data) {
                     $('#courier_cost').html('<option selected disabled>Select courier</option>');
-                    data = JSON.parse(data);
+                    // jQuery sudah otomatis parse JSON jika Content-Type: application/json
                     $.each(data.rajaongkir.results, function(i, result) {
                         $.each(result.costs, function(j, cost) {
                             $('#courier_cost').append($('<option>').text(result.name + ' ' + cost

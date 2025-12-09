@@ -179,20 +179,36 @@ class CartController extends Controller
             $subdistricts = \App\Models\Subdistrict::orderBy('subdistrict_name')->get();
             $client = new Client();
             if (Auth::user()) {
-                $response = $client->request('POST', 'https://pro.rajaongkir.com/api/cost', [
-                    'headers' => ['key' => $this->key],
-                    'form_params' => [
-                        'origin' => User::where('type', 'admin')->first()->address->subdistrict_id,
-                        'originType' => 'subdistrict',
-                        'destination' => Auth::user()->address->subdistrict_id,
-                        'destinationType' => 'subdistrict',
-                        'weight' => $carts->sum('weight_total'),
-                        // 'courier' => 'jne:tiki:pos:jnt',
-                        'courier' => 'jne:jnt',
-                    ]
-                ]);
-                $response = json_decode($response->getBody());
-                return view('shop.buy', compact('carts', 'provinces', 'cities', 'subdistricts', 'stockists', 'response'));
+                try {
+                    $response = $client->request('POST', 'https://rajaongkir.komerce.id/api/v1/calculate/domestic-cost', [
+                        'headers' => [
+                            'key' => $this->key,
+                            'Content-Type' => 'application/x-www-form-urlencoded'
+                        ],
+                        'form_params' => [
+                            'origin' => User::where('type', 'admin')->first()->address->subdistrict_id,
+                            'destination' => Auth::user()->address->subdistrict_id,
+                            'weight' => $carts->sum('weight_total'),
+                            'courier' => 'jne:jnt',
+                            'price' => 'lowest'
+                        ]
+                    ]);
+                    $responseBody = json_decode($response->getBody(), true);
+                    // Transform response baru ke format lama yang diharapkan view
+                    $transformedResponse = $this->transformRajaOngkirResponse($responseBody);
+                    // Convert ke object untuk view blade
+                    $response = json_decode(json_encode($transformedResponse));
+                    return view('shop.buy', compact('carts', 'provinces', 'cities', 'subdistricts', 'stockists', 'response'));
+                } catch (\Exception $e) {
+                    // Fallback jika API error
+                    $response = (object) [
+                        'rajaongkir' => (object) [
+                            'results' => []
+                        ]
+                    ];
+                    Session::flash('warning', 'Gagal mengambil data ongkos kirim. Silakan coba lagi atau hubungi admin.');
+                    return view('shop.buy', compact('carts', 'provinces', 'cities', 'subdistricts', 'stockists', 'response'));
+                }
             }
             return view('shop.buy', compact('carts', 'provinces', 'cities', 'subdistricts', 'stockists'));
         }
@@ -217,22 +233,84 @@ class CartController extends Controller
         }
         $carts = Cart::whereIn('id', $request->carts)->whereNull('transaction_id')->latest()->get();
         $client = new Client();
-        $response = $client->request('POST', 'https://pro.rajaongkir.com/api/cost', [
-            'headers' => ['key' => $this->key],
-            'form_params' => [
-                'origin' => $stockist->address->subdistrict_id,
-                'originType' => 'subdistrict',
-                'destination' => $request->subdistrict_id,
-                'destinationType' => 'subdistrict',
-                'weight' => $carts->sum('weight_total'),
-                // 'courier' => 'jne:tiki:pos:jnt',
-                'courier' => 'jne:jnt',
+        try {
+            $response = $client->request('POST', 'https://rajaongkir.komerce.id/api/v1/calculate/domestic-cost', [
+                'headers' => [
+                    'key' => $this->key,
+                    'Content-Type' => 'application/x-www-form-urlencoded'
+                ],
+                'form_params' => [
+                    'origin' => $stockist->address->subdistrict_id,
+                    'destination' => $request->subdistrict_id,
+                    'weight' => $carts->sum('weight_total'),
+                    'courier' => 'jne:jnt',
+                    'price' => 'lowest'
+                ]
+            ]);
+            $responseBody = json_decode($response->getBody(), true);
+            // Transform response baru ke format lama yang diharapkan view
+            $transformedResponse = $this->transformRajaOngkirResponse($responseBody);
+            // Return sebagai JSON dengan Content-Type yang benar (jQuery akan otomatis parse)
+            return response()->json($transformedResponse);
+        } catch (\Exception $e) {
+            return response()->json([
+                'rajaongkir' => [
+                    'results' => []
+                ]
+            ], 200);
+        }
+    }
+
+    /**
+     * Transform response API RajaOngkir baru ke format lama
+     * Format baru: {"meta": {...}, "data": [{"name": "...", "code": "...", "service": "...", "cost": ..., "etd": "..."}]}
+     * Format lama: {"rajaongkir": {"results": [{"name": "...", "code": "...", "costs": [{"service": "...", "cost": [{"value": ..., "etd": "..."}]}]}]}}
+     */
+    private function transformRajaOngkirResponse($responseBody)
+    {
+        if (!isset($responseBody['data']) || !is_array($responseBody['data'])) {
+            return [
+                'rajaongkir' => [
+                    'results' => []
+                ]
+            ];
+        }
+
+        // Group by courier code
+        $grouped = [];
+        foreach ($responseBody['data'] as $item) {
+            $code = $item['code'] ?? 'unknown';
+            if (!isset($grouped[$code])) {
+                $grouped[$code] = [
+                    'name' => $item['name'] ?? '',
+                    'code' => $code,
+                    'costs' => []
+                ];
+            }
+            
+            // Format ETD: "6 day" -> "6 HARI" atau sesuai format lama
+            $etd = '';
+            if (isset($item['etd']) && $item['etd']) {
+                $etd = str_replace(' day', ' HARI', $item['etd']);
+            }
+            
+            $grouped[$code]['costs'][] = [
+                'service' => $item['service'] ?? '',
+                'description' => $item['description'] ?? '',
+                'cost' => [
+                    [
+                        'value' => $item['cost'] ?? 0,
+                        'etd' => $etd
+                    ]
+                ]
+            ];
+        }
+
+        return [
+            'rajaongkir' => [
+                'results' => array_values($grouped)
             ]
-        ]);
-        // $response = json_decode($response->getBody());
-        // dd($response->);
-        // return response()->json($response->getBody());
-        return $response->getBody();
+        ];
     }
 
     public function check(Request $request)

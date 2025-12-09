@@ -460,7 +460,7 @@
 			};
 			$.post('{{ url("courier-official") }}', input, function(data) {
 				$('#courier-loading').hide();
-				data = JSON.parse(data);
+				// jQuery sudah otomatis parse JSON jika Content-Type: application/json
 				$.each(data.rajaongkir.results, function(i, result) {
 					$.each(result.costs, function(j, cost) {
 						$('#courier_cost').append($('<option>').text(result.name + ' ' + cost.service + ' ' + cost.cost[0].value + ' ' + cost.cost[0].etd).attr('value', cost.cost[0].value));
