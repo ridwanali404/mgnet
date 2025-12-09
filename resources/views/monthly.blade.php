@@ -1008,6 +1008,68 @@
                     </div>
                     <div class="card">
                         <div class="card-body">
+                            <h4 class="card-title">Bonus Total Power Plus <span
+                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
+                            <h6 class="card-subtitle">Total bonus Power Plus untuk yang Qualified (dengan historis harian detailnya)</h6>
+                            <div class="table-responsive">
+                                <table id="monthly-power-plus-history"
+                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
+                                    width="100%">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Tanggal</th>
+                                            <th class="text-right">Bonus (Rp)</th>
+                                            <th>Deskripsi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @php
+                                            $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+                                            $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+                                            $powerPlusQualifications = Auth::user()
+                                                ->powerPlusQualifications()
+                                                ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                                                ->orderBy('date', 'desc')
+                                                ->get();
+                                        @endphp
+                                        @foreach ($powerPlusQualifications as $qualification)
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
+                                                <td><code>{{ $qualification->date }}</code></td>
+                                                <td class="text-right">
+                                                    <code>
+                                                        @if($qualification->bonus_amount > 0)
+                                                            {{ number_format($qualification->bonus_amount, 0, ',', '.') }}
+                                                        @else
+                                                            @if($qualification->is_qualified_30k)
+                                                                Qualified 30K
+                                                            @elseif($qualification->is_qualified_15k)
+                                                                Qualified 15K
+                                                            @else
+                                                                0
+                                                            @endif
+                                                        @endif
+                                                    </code>
+                                                </td>
+                                                <td>
+                                                    @if($qualification->is_qualified_30k)
+                                                        Qualified untuk omzet kaki kecil 30.000 point (Omzet kiri: {{ number_format($qualification->left_omzet, 0, ',', '.') }}, Omzet kanan: {{ number_format($qualification->right_omzet, 0, ',', '.') }}, Kaki kecil: {{ number_format($qualification->smaller_leg_omzet, 0, ',', '.') }})
+                                                    @elseif($qualification->is_qualified_15k)
+                                                        Qualified untuk omzet kaki kecil 15.000 point (Omzet kiri: {{ number_format($qualification->left_omzet, 0, ',', '.') }}, Omzet kanan: {{ number_format($qualification->right_omzet, 0, ',', '.') }}, Kaki kecil: {{ number_format($qualification->smaller_leg_omzet, 0, ',', '.') }})
+                                                    @else
+                                                        Belum qualified (Omzet kiri: {{ number_format($qualification->left_omzet, 0, ',', '.') }}, Omzet kanan: {{ number_format($qualification->right_omzet, 0, ',', '.') }}, Kaki kecil: {{ number_format($qualification->smaller_leg_omzet, 0, ',', '.') }})
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
                             <h4 class="card-title">Bonus Bulanan bagian Statement Bonus Ini nanti isinya :</h4>
                             <ol>
                                 <li>Komisi Penjualan (seperti biasa selisih harga jual beli)</li>
@@ -1388,6 +1450,18 @@
                     },
                 });
                 $('#monthly-power-plus').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    order: [
+                        [1, "desc"]
+                    ],
+                    language: {
+                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    },
+                });
+                $('#monthly-power-plus-history').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
                         'copy', 'csv', 'excel', 'pdf', 'print'
