@@ -109,7 +109,7 @@
                                 </div>
                                 <div class="m-l-10 align-self-center">
                                     <h3 class="m-b-0 font-light">
-                                        {{ Auth::user()->member->member_phase_name ?? 'Administrator' }}&nbsp;
+                                        {{ Auth::user()->member ? Auth::user()->member->member_phase_name : 'Administrator' }}&nbsp;
                                     </h3>
                                     <h5 class="text-muted m-b-0">Peringkat</h5>
                                     <small>&nbsp;</small>

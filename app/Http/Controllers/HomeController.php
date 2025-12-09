@@ -61,11 +61,14 @@ class HomeController extends Controller
 
     public function tree()
     {
+        if (!Auth::user()->member) {
+            return redirect()->back()->with('error', 'Member data not found');
+        }
         $memberPhases = Auth::user()->member->memberPhases()->where('member_phase_name', 'User Q')->orderBy('member_phase_count')->get();
         $rootChildrens = $memberPhases->map(function ($memberPhase) {
             $arrayMemberPhase['name'] = $memberPhase->member_phase_name . ' - ' . $memberPhase->member_phase_count;
             $arrayMemberPhase['children'] = $memberPhase->memberPhaseDetails()->orderBy('member_phase_detail_position')->get()->map(function ($memberPhaseDetail) {
-                $arrayMemberPhaseDetail['name'] = $memberPhaseDetail->member->member_username;
+                $arrayMemberPhaseDetail['name'] = $memberPhaseDetail->member ? $memberPhaseDetail->member->member_username : '';
                 return $arrayMemberPhaseDetail;
             })->toArray();
             return $arrayMemberPhase;
@@ -84,11 +87,15 @@ class HomeController extends Controller
         if ($phase == 'Star Seller') {
             $phaseDB = 'Start Seller';
         }
-        $memberPhases = \App\Models\User::where('username', $username)->first()->member->memberPhases()->where('member_phase_name', $phaseDB)->orderBy('member_phase_count')->get();
+        $user = \App\Models\User::where('username', $username)->first();
+        if (!$user || !$user->member) {
+            return redirect()->back()->with('error', 'Member data not found');
+        }
+        $memberPhases = $user->member->memberPhases()->where('member_phase_name', $phaseDB)->orderBy('member_phase_count')->get();
         $rootChildrens = $memberPhases->map(function ($memberPhase) {
             $arrayMemberPhase['name'] = $memberPhase->member_phase_name . ' - ' . $memberPhase->member_phase_count;
             $arrayMemberPhase['children'] = $memberPhase->memberPhaseDetails()->orderBy('member_phase_detail_position')->get()->map(function ($memberPhaseDetail) {
-                $arrayMemberPhaseDetail['name'] = $memberPhaseDetail->member->member_username;
+                $arrayMemberPhaseDetail['name'] = $memberPhaseDetail->member ? $memberPhaseDetail->member->member_username : '';
                 return $arrayMemberPhaseDetail;
             })->toArray();
             return $arrayMemberPhase;

@@ -312,7 +312,7 @@
                             <div class="row">
                                 <div class="col-12 align-self-center">
                                     <h2 class="font-light text-white text-truncate">
-                                        {{ Auth::user()->member->member_phase_name ?? 'Administrator' }}
+                                        {{ Auth::user()->member ? Auth::user()->member->member_phase_name : 'Administrator' }}
                                     </h2>
                                 </div>
                             </div>
@@ -422,30 +422,6 @@
             </div>
         @endif
         @if (Auth::user()->type != 'admin')
-            <div class="card">
-                <div class="card-body">
-                    <h3 class="card-title">
-                        <div class="btn-group btn-group-sm" role="group">
-                            <button type="button"
-                                class="btn btn-light-secondary text-secondary font-weight-medium dropdown-toggle phase"
-                                data-toggle="dropdown">
-                                Basic Mitra Q
-                            </button>
-                            <div class="dropdown-menu">
-                                <a class="dropdown-item" href="javascript:phase('User Q')">Basic Mitra Q</a>
-                                {{-- <a class="dropdown-item" href="javascript:phase('User Q')">Peringkat User Q</a>
-                                <a class="dropdown-item" href="javascript:phase('Star Seller')">Peringkat Star Seller</a>
-                                <a class="dropdown-item" href="javascript:phase('Reseller')">Peringkat Reseller</a>
-                                <a class="dropdown-item" href="javascript:phase('Agen')">Peringkat Agen</a>
-                                <a class="dropdown-item" href="javascript:phase('Distributor')">Peringkat Distributor</a> --}}
-                            </div>
-                        </div>
-                    </h3>
-                </div>
-                <div class="card-body table-responsive p-0">
-                    <div class="tree text-center"></div>
-                </div>
-            </div>
             <div class="card">
                 <div class="card-body">
                     <h3 class="card-title">
@@ -584,41 +560,6 @@
                     "{{ (Auth::user()->currentUserPackage->amount / (Auth::user()->currentUserPackage->package->price * (\App\Models\KeyValue::where('key', 'reinvest_percent')->value('value') / 100))) * 100 }}%"
                 );
             });
-        </script>
-    @endif
-    @if (Auth::user()->type == 'member')
-        <script src="//d3js.org/d3.v3.min.js"></script>
-        <script src="{{ asset('tree/script.js') }}"></script>
-        <script>
-            function loadD3Data(phase) {
-                d3.json("{{ url('hirearchy/' . Auth::user()->username) }}/" + phase, function(error,
-                    flare) {
-                    if (error) throw error;
-
-                    root = flare;
-                    root.x0 = height / 2;
-                    root.y0 = 0;
-
-                    function collapse(d) {
-                        if (d.children) {
-                            d._children = d.children;
-                            d._children.forEach(collapse);
-                            d.children = null;
-                        }
-                    }
-
-                    root.children.forEach(collapse);
-                    update(root);
-                });
-
-            }
-            loadD3Data('User Q');
-
-            function phase(phase) {
-                $('.phase').html('Basic Mitra Q');
-                // $('.phase').html('Peringkat ' + phase + ' ');
-                loadD3Data(phase);
-            }
         </script>
     @endif
 @endsection

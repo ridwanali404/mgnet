@@ -658,7 +658,7 @@
                                         placeholder="4 DIGIT PIN" required />
                                     <div class="form-text" style="line-height: 1;">
                                         <small>
-                                            @if (!Auth::user()->member->member_pin)
+                                            @if (!Auth::user()->member || !Auth::user()->member->member_pin)
                                                 Maaf, Anda belum membuat Pin Stokis. Silahkan <a
                                                     href="{{ url('account') }}">buat
                                                     Pin Stokis</a> terlebih dulu.

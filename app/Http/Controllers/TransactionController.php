@@ -139,7 +139,7 @@ class TransactionController extends Controller
             $total_price += $a->price_total;
             $total_poin += $a->poin_total;
             $total_weight += $a->weight_total;
-            if (Auth::guest() || (Auth::user() && Auth::user()->member->member_phase_name == 'User Free')) {
+            if (Auth::guest() || (Auth::user() && Auth::user()->member && Auth::user()->member->member_phase_name == 'User Free')) {
                 $total_cashback += ($a->price_total - ($a->product->price_member * $a->qty));
             }
             $a->update([
