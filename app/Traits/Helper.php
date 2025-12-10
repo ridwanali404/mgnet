@@ -119,10 +119,11 @@ trait Helper
                             }
                         }
                     }
+                    $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                     $bonus = $sponsor->bonuses()->create([
                         'type' => 'Komisi Sponsor',
                         'amount' => $amount,
-                        'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
+                        'description' => 'Komisi Sponsor dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.',
                     ]);
                     Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                 }
@@ -140,10 +141,11 @@ trait Helper
                         $amount = $pin->bonus_sponsor;
                     }
                     if ($amount > 0) {
+                        $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                         $bonus = $sponsor->bonuses()->create([
                             'type' => 'Komisi Sponsor',
                             'amount' => $amount,
-                            'description' => 'Komisi Sponsor dari penggunaan pin ' . $pin->name . ' oleh ' . $user->username . '.',
+                            'description' => 'Komisi Sponsor dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.',
                         ]);
                         Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                     }
@@ -208,10 +210,11 @@ trait Helper
                                 // Berikan bonus Gold ke Gold sponsor
                                 if ($goldAmount > 0) {
                                     $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                    $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                     $goldBonus = $sponsor->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $goldAmount,
-                                        'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').',
+                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').',
                                     ]);
                                     Helper::automaintain($sponsor, 'K', $goldBonus->amount, 'Saldo automaintain dari ' . $goldBonus->description);
                                 }
@@ -223,10 +226,11 @@ trait Helper
                                 // Berikan selisih ke Platinum upline
                                 if ($differenceAmount > 0) {
                                     $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                    $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                     $bonus = $platinumUpline->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $differenceAmount,
-                                        'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                                     ]);
                                     Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                                 }
@@ -258,10 +262,11 @@ trait Helper
                             $amount = round($totalAllocation * $percent / 100);
                             
                             if ($amount > 0 && $activeUpline->premiumUserPin && in_array($activeUpline->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
+                                $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                 $bonus = $activeUpline->bonuses()->create([
                                     'type' => 'Bonus Generasi',
                                     'amount' => $amount,
-                                    'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                    'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                                 ]);
                                 Helper::automaintain($activeUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                             }
@@ -278,10 +283,11 @@ trait Helper
                         
                         if ($amount > 0) {
                             $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                            $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                             $bonus = $sponsor->bonuses()->create([
                                 'type' => 'Bonus Generasi',
                                 'amount' => $amount,
-                                'description' => 'Bonus Generasi dari upgrade ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                             ]);
                             Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                         }
@@ -303,10 +309,11 @@ trait Helper
                 if ($monoleg) {
                     $amount = round($pin->price * $pin->monoleg_percent / 100);
                     if ($amount > 0) {
+                        $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                         $bonus = $monoleg->bonuses()->create([
                             'type' => 'Komisi Monoleg',
                             'amount' => $amount,
-                            'description' => 'Bonus Monoleg 9% dari upgrade ' . $user->username . ' paket ' . $pin->name . '.',
+                            'description' => 'Bonus Monoleg 9% dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.',
                         ]);
                         Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                     }
