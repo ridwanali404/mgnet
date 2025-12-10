@@ -137,14 +137,30 @@ class UserService
 
     /**
      * Check if user is monthly royalty qualified
+     * Syarat:
+     * 1. Platinum sejak join awal (UPGRADE tidak termasuk)
+     * 2. Platinum aktif
      */
     public function monthlyRoyaltyQualified(User $user, $month)
     {
-        $qty = $this->monthlyPoin($user, $month);
-        if ($qty >= 250) {
-            return true;
+        // Cek apakah user Platinum sejak join awal (bukan upgrade)
+        if (!$user->premiumUserPin || !$user->premiumUserPin->pin) {
+            return false;
         }
-        return false;
+        
+        $pin = $user->premiumUserPin->pin;
+        
+        // Hanya Platinum sejak join awal (type = 'premium', bukan 'upgrade')
+        if ($pin->name !== 'Platinum' || $pin->type !== 'premium') {
+            return false;
+        }
+        
+        // Cek apakah Platinum aktif
+        if (!$user->is_active) {
+            return false;
+        }
+        
+        return true;
     }
 
     /**

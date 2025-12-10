@@ -197,6 +197,7 @@ Route::group(['middleware' => ['auth']], function () {
         Route::get('poin/enable', 'PoinController@enable')->name('poin.enable');
         Route::get('poin/disable', 'PoinController@disable')->name('poin.disable');
         Route::resource('poin', 'PoinController');
+        Route::get('report-omset', 'ReportOmsetController@index')->name('report-omset.index');
         Route::get('qualified/royalty', 'HomeController@royalty');
         Route::get('qualified', 'HomeController@qualified');
         Route::get('daily/pair', 'DailyProfitController@pair');

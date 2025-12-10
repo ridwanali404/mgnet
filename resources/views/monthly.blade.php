@@ -708,7 +708,7 @@
                         <div class="card-body">
                             <h4 class="card-title">Member Qualified Bonus Royalti 13%</h4>
                             <h6 class="card-subtitle">
-                                Member yang memenuhi syarat untuk mendapatkan Bonus Royalti 13%.
+                                Member Platinum sejak join awal (UPGRADE tidak termasuk) dan Platinum aktif yang memenuhi syarat untuk mendapatkan Bonus Royalti 13%.
                                 Bonus yang dibagikan sebesar
                                 <span class="font-weight-bold" id="royalty-amount">
                                     <div class="spinner-border spinner-border-sm" role="status">

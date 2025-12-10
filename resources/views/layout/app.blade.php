@@ -262,6 +262,10 @@
                                 <a href="{{ url('monthly') }}" aria-expanded="false"><i
                                         class="mdi mdi-gift"></i><span class="hide-menu">Bonus Bulanan</span></a>
                             </li>
+                            <li class="{{ request()->segment(1) == 'report-omset' ? 'active' : '' }}">
+                                <a href="{{ route('report-omset.index') }}" aria-expanded="false"><i
+                                        class="mdi mdi-chart-line"></i><span class="hide-menu">Report Omset</span></a>
+                            </li>
                         @endif
                         @if (auth()->user()->type == 'admin' || (auth()->user()->type == 'member' && auth()->user()->userPin?->level >= 3))
                             <li class="{{ Route::is('userAward.index') ? 'active' : '' }}">
