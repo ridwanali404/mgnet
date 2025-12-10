@@ -274,7 +274,7 @@
         jQuery(document).ready(function() {
             $('.datatable').DataTable({
                 "language": {
-                    "url": "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    "url": "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                 },
                 "order": [
                     [1, "desc"]

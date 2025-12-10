@@ -5,7 +5,7 @@
         rel="stylesheet">
     <link href="{{ asset('material-pro/assets/plugins/datatables.net-bs4/css/responsive.dataTables.min.css') }}"
         rel="stylesheet">
-    <link rel="stylesheet" href="//cdn.datatables.net/select/1.3.3/css/select.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.3/css/select.dataTables.min.css">
     <style>
         .dt-bootstrap4 {
             padding: 0 !important;
@@ -1180,7 +1180,7 @@
     <!-- This is data table -->
     <script src="{{ asset('material-pro/assets/plugins/datatables.net/js/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('material-pro/assets/plugins/datatables.net-bs4/js/dataTables.responsive.min.js') }}"></script>
-    <script src="//cdn.datatables.net/select/1.3.3/js/dataTables.select.min.js"></script>
+    <script src="https://cdn.datatables.net/select/1.3.3/js/dataTables.select.min.js"></script>
     <!-- start - This is for export functionality only -->
     <script src="https://cdn.datatables.net/buttons/1.2.2/js/dataTables.buttons.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/1.2.2/js/buttons.flash.min.js"></script>
@@ -1192,7 +1192,7 @@
     <!-- end - This is for export functionality only -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.37/moment-timezone-with-data.min.js"></script>
-    <script src="//cdn.datatables.net/plug-ins/1.11.4/dataRender/datetime.js"></script>
+    <script src="https://cdn.datatables.net/plug-ins/1.11.4/dataRender/datetime.js"></script>
     <script>
         jQuery(document).ready(function() {
             $("#month").on('change', function() {
@@ -1278,7 +1278,7 @@
                         [1, "asc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                     "bProcessing": true,
                     "sAjaxSource": "/qualified?month={{ $month }}",
@@ -1325,7 +1325,7 @@
                         [1, "asc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                     "bProcessing": true,
                     "sAjaxSource": "/qualified/royalty?month={{ $month }}",
@@ -1372,7 +1372,7 @@
                         [1, "asc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
                 $.get("/potency/profit-sharing-13?month={{ $month }}", function(data,
@@ -1441,7 +1441,7 @@
                         [1, "desc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                     "bProcessing": true,
                     "sAjaxSource": "/potency/{{ Auth::id() }}/list?month={{ $month }}",
@@ -1484,7 +1484,7 @@
                         [1, "desc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
                 $('#monthly-cashback').DataTable({
@@ -1496,7 +1496,7 @@
                         [1, "desc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
                 $('#monthly-profit-sharing').DataTable({
@@ -1508,7 +1508,7 @@
                         [1, "desc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
                 $('#monthly-power-plus').DataTable({
@@ -1520,7 +1520,7 @@
                         [1, "desc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
                 $('#monthly-power-plus-history').DataTable({
@@ -1532,7 +1532,7 @@
                         [1, "desc"]
                     ],
                     language: {
-                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
             });
