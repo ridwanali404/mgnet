@@ -483,6 +483,7 @@
                                             <th class="text-right">Komisi Penjualan (Rp)</th>
                                             <th class="text-right">Bonus Unilevel RO (Rp)</th>
                                             <th class="text-right">Bonus Royalti Profit Sharing 13% (Rp)</th>
+                                            <th class="text-right">Bonus Power Plus (Rp)</th>
                                             <th class="text-right">Total</th>
                                             <th class="text-right">Admin</th>
                                             <th class="text-right">Pajak</th>
@@ -500,6 +501,7 @@
                                                 $monthly_cashback_bonuses = $a->monthlyCashbackBonuses($month)->sum('amount');
                                                 $monthly_unilevel_RO_bonuses = $a->monthlyUnilevelROBonuses($month)->sum('amount');
                                                 $monthly_profit_sharing_13_bonuses = $a->monthlyProfitSharing13Bonuses($month)->sum('amount');
+                                                $monthly_power_plus_bonuses = $a->monthlyPowerPlusBonuses($month)->sum('amount');
                                                 $monthly_bonus = $a->monthlyBonuses($month)->first();
                                                 $monthly_bonuses = $a->monthlyBonuses($month)->sum('amount');
                                                 $monthly_qualified = $a->monthlyQualified($month);
@@ -552,6 +554,9 @@
                                                     <code>{{ number_format($monthly_profit_sharing_13_bonuses, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-right">
+                                                    <code>{{ number_format($monthly_power_plus_bonuses, 0, ',', '.') }}</code>
+                                                </td>
+                                                <td class="text-right">
                                                     <code>{{ number_format($monthly_bonuses, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-right">
@@ -597,6 +602,7 @@
                                             <th class="text-right">Komisi Penjualan (Rp)</th>
                                             <th class="text-right">Bonus Unilevel RO (Rp)</th>
                                             <th class="text-right">Bonus Royalti Profit Sharing 13% (Rp)</th>
+                                            <th class="text-right">Bonus Power Plus (Rp)</th>
                                             <th class="text-right">Total</th>
                                             <th class="text-right">Admin</th>
                                             <th class="text-right">Pajak</th>
@@ -736,6 +742,50 @@
                                             <th class="text-right">Bonus (Rp)</th>
                                         </tr>
                                     </thead>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Bonus Power Plus <span
+                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
+                            <h6 class="card-subtitle">Bonus Power Plus untuk yang Qualified</h6>
+                            <div class="table-responsive">
+                                <table id="admin-monthly-power-plus"
+                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
+                                    width="100%">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Username</th>
+                                            <th>Nama</th>
+                                            <th class="text-right">Bonus (Rp)</th>
+                                            <th>Deskripsi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @php
+                                            $counter = 1;
+                                        @endphp
+                                        @foreach ($users as $user)
+                                            @foreach ($user->monthlyPowerPlusBonuses($month)->latest()->get() as $bonus)
+                                                <tr>
+                                                    <td>{{ $counter++ }}</td>
+                                                    <td>
+                                                        <a href="{{ url('user/' . $user->id . '/profile') }}">
+                                                            {{ $user->username }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ $user->name }}</td>
+                                                    <td class="text-right">
+                                                        <code>{{ number_format($bonus->amount, 0, ',', '.') }}</code>
+                                                    </td>
+                                                    <td>{{ $bonus->description }}</td>
+                                                </tr>
+                                            @endforeach
+                                        @endforeach
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -1313,6 +1363,18 @@
                         cell.innerHTML = i + 1;
                     });
                 }).draw();
+                $('#admin-monthly-power-plus').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    order: [
+                        [1, "asc"]
+                    ],
+                    language: {
+                        url: "//cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    },
+                });
                 $.get("/potency/profit-sharing-13?month={{ $month }}", function(data,
                     status) {
                     if (status == 'success') {
