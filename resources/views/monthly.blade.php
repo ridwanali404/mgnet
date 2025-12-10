@@ -790,6 +790,52 @@
                             </div>
                         </div>
                     </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Historis Harian Profit Sharing <span
+                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
+                            <h6 class="card-subtitle">Riwayat profit sharing per hari untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (batas jam 23:59 WIB auto-counting)</h6>
+                            <div class="table-responsive">
+                                <table id="admin-monthly-profit-sharing-daily"
+                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
+                                    width="100%">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Username</th>
+                                            <th>Nama</th>
+                                            <th>Tanggal</th>
+                                            <th class="text-right">Profit Sharing (Rp)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @php
+                                            $counter = 1;
+                                            $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+                                            $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+                                        @endphp
+                                        @foreach ($users as $user)
+                                            @foreach ($user->dailyProfitSharingHistory($month)->get() as $daily)
+                                                <tr>
+                                                    <td>{{ $counter++ }}</td>
+                                                    <td>
+                                                        <a href="{{ url('user/' . $user->id . '/profile') }}">
+                                                            {{ $user->username }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ $user->name }}</td>
+                                                    <td><code>{{ \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y') }}</code></td>
+                                                    <td class="text-right">
+                                                        <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 @else
                     <div class="card table-responsive">
                         <table class="table table-hover table-stripped m-0">
@@ -994,7 +1040,7 @@
                         <div class="card-body">
                             <h4 class="card-title">Bonus Total Global Profit Sharing <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
-                            <h6 class="card-subtitle">Total bonus profit sharing untuk Platinum (dengan historis harian detailnya)</h6>
+                            <h6 class="card-subtitle">Total bonus profit sharing untuk Platinum</h6>
                             <div class="table-responsive">
                                 <table id="monthly-profit-sharing"
                                     class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
@@ -1016,6 +1062,37 @@
                                                     <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td>{{ $a->description }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Historis Harian Profit Sharing <span
+                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
+                            <h6 class="card-subtitle">Riwayat profit sharing per hari untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (batas jam 23:59 WIB auto-counting)</h6>
+                            <div class="table-responsive">
+                                <table id="monthly-profit-sharing-daily"
+                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
+                                    width="100%">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Tanggal</th>
+                                            <th class="text-right">Profit Sharing (Rp)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (Auth::user()->dailyProfitSharingHistory($month)->get() as $daily)
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
+                                                <td><code>{{ \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y') }}</code></td>
+                                                <td class="text-right">
+                                                    <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -1375,6 +1452,18 @@
                         url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
+                $('#admin-monthly-profit-sharing-daily').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    order: [
+                        [3, "desc"]
+                    ],
+                    language: {
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    },
+                });
                 $.get("/potency/profit-sharing-13?month={{ $month }}", function(data,
                     status) {
                     if (status == 'success') {
@@ -1500,6 +1589,18 @@
                     },
                 });
                 $('#monthly-profit-sharing').DataTable({
+                    dom: 'Bfrtip',
+                    buttons: [
+                        'copy', 'csv', 'excel', 'pdf', 'print'
+                    ],
+                    order: [
+                        [1, "desc"]
+                    ],
+                    language: {
+                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
+                    },
+                });
+                $('#monthly-profit-sharing-daily').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
                         'copy', 'csv', 'excel', 'pdf', 'print'

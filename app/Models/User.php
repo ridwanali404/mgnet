@@ -234,6 +234,11 @@ class User extends Authenticatable
         return $this->hasMany(ProfitSharing::class);
     }
 
+    public function profitSharingDaily()
+    {
+        return $this->hasMany(ProfitSharingDaily::class);
+    }
+
     public function powerPlusQualifications()
     {
         return $this->hasMany(PowerPlusQualification::class);
@@ -329,6 +334,16 @@ class User extends Authenticatable
         return $this->bonuses()->whereYear('created_at', date('Y', strtotime($month)))->whereMonth('created_at', date('m', strtotime($month)))->where(function ($q) {
             $q->where('type', 'Bonus Profit Sharing');
         });
+    }
+
+    public function dailyProfitSharingHistory($month)
+    {
+        $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+        
+        return $this->profitSharingDaily()
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('date', 'desc');
     }
 
     public function monthlyPowerPlusBonuses($month)

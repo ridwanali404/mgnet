@@ -23,6 +23,7 @@ use App\Models\GlobalDailyPoin;
 use App\Models\OfficialTransaction;
 use App\Models\PowerPlusQualification;
 use App\Models\ProfitSharing;
+use App\Models\ProfitSharingDaily;
 use App\Models\UmrohTripSaving;
 use Illuminate\Support\Facades\Mail;
 
@@ -861,6 +862,17 @@ trait Helper
                         'wallet_cashback' => $walletCashback,
                         'date' => $date,
                     ]);
+                    
+                    // Simpan riwayat harian profit sharing
+                    \App\Models\ProfitSharingDaily::updateOrCreate(
+                        [
+                            'user_id' => $user->id,
+                            'date' => $date,
+                        ],
+                        [
+                            'amount' => $profitSharingAmount,
+                        ]
+                    );
                 }
             }
         }
