@@ -683,48 +683,6 @@
                     </div>
                     <div class="card">
                         <div class="card-body">
-                            <h4 class="card-title">Member Qualified Bonus Royalti 13%</h4>
-                            <h6 class="card-subtitle">
-                                Member Platinum sejak join awal (UPGRADE tidak termasuk) dan Platinum aktif yang memenuhi syarat untuk mendapatkan Bonus Royalti 13%.
-                                Bonus yang dibagikan sebesar
-                                <span class="font-weight-bold" id="royalty-amount">
-                                    <div class="spinner-border spinner-border-sm" role="status">
-                                        <span class="sr-only">Loading...</span>
-                                    </div>
-                                </span>
-                                yang didapatkan dari
-                                <span class="font-weight-bold" id="royalty-poin">
-                                    <div class="spinner-border spinner-border-sm" role="status">
-                                        <span class="sr-only">Loading...</span>
-                                    </div>
-                                </span>
-                                PV × 1.000 × 13% ÷
-                                <span class="font-weight-bold" id="royalty-qualified">
-                                    <div class="spinner-border spinner-border-sm" role="status">
-                                        <span class="sr-only">Loading...</span>
-                                    </div>
-                                </span>
-                                member
-                            </h6>
-                            <div class="table-responsive">
-                                <table id="royalty"
-                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
-                                    width="100%">
-                                    <thead>
-                                        <tr>
-                                            <th data-orderable="false">#</th>
-                                            <th>Username</th>
-                                            <th>Nama</th>
-                                            <th class="text-right">Poin</th>
-                                            <th class="text-right">Bonus (Rp)</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-body">
                             <h4 class="card-title">Bonus Power Plus <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
                             <h6 class="card-subtitle">Bonus Power Plus untuk yang Qualified</h6>
@@ -810,6 +768,32 @@
                                         @endforeach
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Omset Grup Powerplus per Member</h4>
+                            <h6 class="card-subtitle">Lihat omset grup powerplus untuk member tertentu</h6>
+                            <div class="form-group mt-3">
+                                <label>Pilih Member</label>
+                                <select id="powerplus-member-select" class="form-control" style="width: 100%;">
+                                    <option value="">-- Pilih Member --</option>
+                                </select>
+                            </div>
+                            <div id="powerplus-member-omzet" style="display: none;">
+                                <div class="card table-responsive mt-3">
+                                    <table class="table table-hover table-stripped m-0">
+                                        <thead>
+                                            <tr style="line-height: 1.3;">
+                                                <th class="text-center">Leg<br><small class="text-muted">Nama grup</small></th>
+                                                <th class="text-center">Omset (Poin)<br><small class="text-muted">Total omset grup</small></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="powerplus-leg-omzet-body">
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1051,6 +1035,27 @@
                             <h4 class="card-title">Historis Harian Profit Sharing <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
                             <h6 class="card-subtitle">Riwayat profit sharing per hari untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (batas jam 23:59 WIB auto-counting)</h6>
+                            @php
+                                $dailyProfitSharingHistory = Auth::user()->dailyProfitSharingHistory($month)->get();
+                                $totalDailyProfitSharing = $dailyProfitSharingHistory->sum('amount');
+                            @endphp
+                            {{-- Card Summary Global Profit Sharing --}}
+                            <div class="card table-responsive mt-3 mb-3">
+                                <table class="table table-hover table-stripped m-0">
+                                    <thead>
+                                        <tr style="line-height: 1.3;">
+                                            <th class="text-center">Global Profit Sharing<br><small class="text-muted">Total nominal profit sharing bulan ini</small></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="text-center">
+                                                <code class="font-weight-bold" style="font-size: 1.2em;">Rp {{ number_format($totalDailyProfitSharing, 0, ',', '.') }}</code>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                             <div class="table-responsive">
                                 <table id="monthly-profit-sharing-daily"
                                     class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
@@ -1063,7 +1068,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (Auth::user()->dailyProfitSharingHistory($month)->get() as $daily)
+                                        @foreach ($dailyProfitSharingHistory as $daily)
                                             <tr>
                                                 <td>{{ $loop->index + 1 }}</td>
                                                 <td><code>{{ \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y') }}</code></td>
@@ -1073,6 +1078,16 @@
                                             </tr>
                                         @endforeach
                                     </tbody>
+                                    @if($totalDailyProfitSharing > 0)
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="2" class="text-right">Total:</th>
+                                            <th class="text-right">
+                                                <code>Rp {{ number_format($totalDailyProfitSharing, 0, ',', '.') }}</code>
+                                            </th>
+                                        </tr>
+                                    </tfoot>
+                                    @endif
                                 </table>
                             </div>
                         </div>
@@ -1115,6 +1130,40 @@
                             <h4 class="card-title">Bonus Total Power Plus <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
                             <h6 class="card-subtitle">Total bonus Power Plus untuk yang Qualified (dengan historis harian detailnya)</h6>
+                            @php
+                                $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+                                $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+                                $powerPlusQualifications = Auth::user()
+                                    ->powerPlusQualifications()
+                                    ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                                    ->orderBy('date', 'desc')
+                                    ->get();
+                                $latestQualification = $powerPlusQualifications->first();
+                                $legOmzets = $latestQualification && $latestQualification->leg_omzets ? $latestQualification->leg_omzets : [];
+                            @endphp
+                            {{-- Card Summary Poin Group Powerplus --}}
+                            @if(!empty($legOmzets))
+                            <div class="card table-responsive mt-3 mb-3">
+                                <table class="table table-hover table-stripped m-0">
+                                    <thead>
+                                        <tr style="line-height: 1.3;">
+                                            @foreach($legOmzets as $legName => $omzet)
+                                                <th class="text-center">{{ $legName }}<br><small class="text-muted">Omset grup {{ strtolower($legName) }}</small></th>
+                                            @endforeach
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            @foreach($legOmzets as $legName => $omzet)
+                                                <td class="text-center">
+                                                    <code class="font-weight-bold" style="font-size: 1.2em;">{{ number_format($omzet, 0, ',', '.') }}</code>
+                                                </td>
+                                            @endforeach
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            @endif
                             <div class="table-responsive">
                                 <table id="monthly-power-plus-history"
                                     class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
@@ -1123,46 +1172,54 @@
                                         <tr>
                                             <th>#</th>
                                             <th>Tanggal</th>
+                                            @if($latestQualification && $latestQualification->leg_omzets && !empty($latestQualification->leg_omzets))
+                                                @foreach($latestQualification->leg_omzets as $legName => $omzet)
+                                                    <th class="text-right">{{ $legName }}</th>
+                                                @endforeach
+                                            @else
+                                                <th class="text-right">Poin Kiri</th>
+                                                <th class="text-right">Poin Kanan</th>
+                                            @endif
                                             <th class="text-right">Bonus (Rp)</th>
-                                            <th>Deskripsi</th>
+                                            <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @php
-                                            $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-                                            $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
-                                            $powerPlusQualifications = Auth::user()
-                                                ->powerPlusQualifications()
-                                                ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                                                ->orderBy('date', 'desc')
-                                                ->get();
-                                        @endphp
                                         @foreach ($powerPlusQualifications as $qualification)
                                             <tr>
                                                 <td>{{ $loop->index + 1 }}</td>
-                                                <td><code>{{ $qualification->date }}</code></td>
+                                                <td><code>{{ \Carbon\Carbon::parse($qualification->date)->translatedFormat('d F Y') }}</code></td>
+                                                @if($qualification->leg_omzets && !empty($qualification->leg_omzets))
+                                                    @foreach($qualification->leg_omzets as $legName => $omzet)
+                                                        <td class="text-right">
+                                                            <code>{{ number_format($omzet, 0, ',', '.') }}</code>
+                                                        </td>
+                                                    @endforeach
+                                                @else
+                                                    {{-- Fallback untuk data lama --}}
+                                                    <td class="text-right">
+                                                        <code>{{ number_format($qualification->left_omzet, 0, ',', '.') }}</code>
+                                                    </td>
+                                                    <td class="text-right">
+                                                        <code>{{ number_format($qualification->right_omzet, 0, ',', '.') }}</code>
+                                                    </td>
+                                                @endif
                                                 <td class="text-right">
                                                     <code>
                                                         @if($qualification->bonus_amount > 0)
                                                             {{ number_format($qualification->bonus_amount, 0, ',', '.') }}
                                                         @else
-                                                            @if($qualification->is_qualified_30k)
-                                                                Qualified 30K
-                                                            @elseif($qualification->is_qualified_15k)
-                                                                Qualified 15K
-                                                            @else
-                                                                0
-                                                            @endif
+                                                            0
                                                         @endif
                                                     </code>
                                                 </td>
                                                 <td>
                                                     @if($qualification->is_qualified_30k)
-                                                        Qualified untuk omzet kaki kecil 30.000 point (Omzet kiri: {{ number_format($qualification->left_omzet, 0, ',', '.') }}, Omzet kanan: {{ number_format($qualification->right_omzet, 0, ',', '.') }}, Kaki kecil: {{ number_format($qualification->smaller_leg_omzet, 0, ',', '.') }})
+                                                        <span class="badge badge-success">Qualified 30K</span>
                                                     @elseif($qualification->is_qualified_15k)
-                                                        Qualified untuk omzet kaki kecil 15.000 point (Omzet kiri: {{ number_format($qualification->left_omzet, 0, ',', '.') }}, Omzet kanan: {{ number_format($qualification->right_omzet, 0, ',', '.') }}, Kaki kecil: {{ number_format($qualification->smaller_leg_omzet, 0, ',', '.') }})
+                                                        <span class="badge badge-info">Qualified 15K</span>
                                                     @else
-                                                        Belum qualified (Omzet kiri: {{ number_format($qualification->left_omzet, 0, ',', '.') }}, Omzet kanan: {{ number_format($qualification->right_omzet, 0, ',', '.') }}, Kaki kecil: {{ number_format($qualification->smaller_leg_omzet, 0, ',', '.') }})
+                                                        <span class="badge badge-warning">Belum Qualified</span>
                                                     @endif
                                                 </td>
                                             </tr>
@@ -1255,8 +1312,64 @@
         });
     </script>
     @if (in_array(Auth::user()->type, ['admin', 'cradmin']))
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
         <script>
             jQuery(document).ready(function() {
+                // Initialize Select2 for Powerplus member select
+                $("#powerplus-member-select").select2({
+                    placeholder: "Cari member...",
+                    allowClear: true,
+                    ajax: {
+                        url: '/filter-user',
+                        data: function(params) {
+                            return {
+                                search: params.term,
+                                page: params.page || 1
+                            };
+                        },
+                        processResults: function(data) {
+                            return {
+                                results: data.data,
+                                pagination: {
+                                    more: (data.current_page * data.per_page) < data.total
+                                }
+                            };
+                        },
+                        cache: true,
+                    }
+                }).on("select2:select", function(e) {
+                    var userId = e.params.data.id;
+                    var month = "{{ $month }}";
+                    
+                    // Load omset grup untuk member yang dipilih
+                    $.get('/api/powerplus-leg-omzet', {
+                        user_id: userId,
+                        month: month
+                    }, function(data) {
+                        if (data.success && data.leg_omzets) {
+                            var html = '';
+                            $.each(data.leg_omzets, function(legName, omzet) {
+                                html += '<tr>';
+                                html += '<td class="text-center"><strong>' + legName + '</strong></td>';
+                                html += '<td class="text-center"><code class="font-weight-bold" style="font-size: 1.1em;">' + parseInt(omzet).toLocaleString('id-ID') + '</code></td>';
+                                html += '</tr>';
+                            });
+                            $('#powerplus-leg-omzet-body').html(html);
+                            $('#powerplus-member-omzet').show();
+                        } else {
+                            $('#powerplus-leg-omzet-body').html('<tr><td colspan="2" class="text-center">Tidak ada data omset grup untuk bulan ini</td></tr>');
+                            $('#powerplus-member-omzet').show();
+                        }
+                    }).fail(function() {
+                        $('#powerplus-leg-omzet-body').html('<tr><td colspan="2" class="text-center text-danger">Gagal memuat data</td></tr>');
+                        $('#powerplus-member-omzet').show();
+                    });
+                }).on("select2:clear", function() {
+                    $('#powerplus-member-omzet').hide();
+                    $('#powerplus-leg-omzet-body').html('');
+                });
+                
                 var monthly = $('#monthly-bonuses').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
@@ -1370,53 +1483,6 @@
                         cell.innerHTML = i + 1;
                     });
                 }).draw();
-                var royalty = $('#royalty').DataTable({
-                    dom: 'Bfrtip',
-                    buttons: [
-                        'copy', 'csv', 'excel', 'pdf', 'print'
-                    ],
-                    order: [
-                        [1, "asc"]
-                    ],
-                    language: {
-                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
-                    },
-                    "bProcessing": true,
-                    "sAjaxSource": "/qualified/royalty?month={{ $month }}",
-                    "aoColumns": [{
-                            "mDataProp": null
-                        },
-                        {
-                            "mDataProp": "username"
-                        },
-                        {
-                            "mDataProp": "name"
-                        },
-                        {
-                            "mDataProp": "poin",
-                            "mRender": function(data) {
-                                return '<code>' + data.toLocaleString('id') + '</code>';
-                            },
-                            "sClass": "text-right",
-                        },
-                        {
-                            "mDataProp": "bonus",
-                            "mRender": function(data) {
-                                return '<code>' + data.toLocaleString('id') + '</code>';
-                            },
-                            "sClass": "text-right",
-                            "bVisible": {{ $closing ? 'true' : 'false' }},
-                        },
-                    ]
-                });
-                royalty.on('order.dt search.dt', function() {
-                    royalty.column(0, {
-                        search: 'applied',
-                        order: 'applied'
-                    }).nodes().each(function(cell, i) {
-                        cell.innerHTML = i + 1;
-                    });
-                }).draw();
                 $('#admin-monthly-power-plus').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
@@ -1441,20 +1507,6 @@
                         url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
-                $.get("/potency/profit-sharing-13?month={{ $month }}", function(data,
-                    status) {
-                    if (status == 'success') {
-                        $('#royalty-amount').html('Rp ' + data.amount.toString().replace(
-                            /\B(?=(\d{3})+(?!\d))/g, "."));
-                        $('#royalty-poin').html(data.poin.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."));
-                        $('#royalty-qualified').html(data.qualified.toString().replace(/\B(?=(\d{3})+(?!\d))/g,
-                            "."));
-                    }
-                }).fail(function() {
-                    $('#royalty-amount').html('Data gagal dimuat');
-                    $('#royalty-poin').html('Data gagal dimuat');
-                    $('#royalty-qualified').html('Data gagal dimuat');
-                });
             });
         </script>
     @else
@@ -1464,34 +1516,19 @@
                     data, status) {
                     if (status == 'success') {
                         $('#potency').html(data);
-                        $.get("/potency/profit-sharing-13?month={{ $month }}",
-                            function(data, status) {
-                                if (status == 'success') {
-                                    $('#poin-sharing-13').html(data.amount.toString().replace(
-                                        /\B(?=(\d{3})+(?!\d))/g, "."));
-                                    var cashback = parseFloat($('#cashback').text().replace(/\./g, ""));
-                                    var potency = parseFloat($('#potency').text().replace(/\./g, ""));
-                                    var poinsharing13 = parseFloat($('#poin-sharing-13').text().replace(
-                                        /\./g, ""));
-                                    var sum = cashback + potency + poinsharing13;
-                                    $('#sum').html(sum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."));
-                                    var administrative = sum <= 10000 ? 0 : 10000;
-                                    $('#administrative').html(administrative.toString().replace(
-                                        /\B(?=(\d{3})+(?!\d))/g, "."));
-                                    var tax = Math.round(sum >= 330000 ? ('{{ Auth::user()->npwp }}' !=
-                                        '' ? (sum * 5 / 100) : (sum * 6 / 100)) : 0);
-                                    $('#tax').html(tax.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."));
-                                    var total = sum - administrative - tax;
-                                    $('#total').html(total.toString().replace(/\B(?=(\d{3})+(?!\d))/g,
-                                        "."));
-                                }
-                            }).fail(function() {
-                            $('#poin-sharing-13').html('Data gagal dimuat');
-                            $('#sum').html('Data gagal dimuat');
-                            $('#administrative').html('Data gagal dimuat');
-                            $('#tax').html('Data gagal dimuat');
-                            $('#total').html('Data gagal dimuat');
-                        });
+                        var cashback = parseFloat($('#cashback').text().replace(/\./g, ""));
+                        var potency = parseFloat($('#potency').text().replace(/\./g, ""));
+                        var sum = cashback + potency;
+                        $('#sum').html(sum.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+                        var administrative = sum <= 10000 ? 0 : 10000;
+                        $('#administrative').html(administrative.toString().replace(
+                            /\B(?=(\d{3})+(?!\d))/g, "."));
+                        var tax = Math.round(sum >= 330000 ? ('{{ Auth::user()->npwp }}' !=
+                            '' ? (sum * 5 / 100) : (sum * 6 / 100)) : 0);
+                        $('#tax').html(tax.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+                        var total = sum - administrative - tax;
+                        $('#total').html(total.toString().replace(/\B(?=(\d{3})+(?!\d))/g,
+                            "."));
                     } else {
                         $('#potency').html('Data gagal dimuat');
                     }

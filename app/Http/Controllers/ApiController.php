@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class ApiController extends Controller
 {
@@ -164,5 +165,46 @@ class ApiController extends Controller
     {
         // Leg Kiri tidak menampilkan downline apapun
         return;
+    }
+
+    /**
+     * API untuk mendapatkan leg omset powerplus untuk member tertentu
+     */
+    public function powerplusLegOmzet(Request $request)
+    {
+        $userId = $request->input('user_id');
+        $month = $request->input('month', date('Y-m'));
+        
+        $user = User::find($userId);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User tidak ditemukan'
+            ], 404);
+        }
+        
+        // Cari qualification untuk bulan tersebut
+        $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+        
+        $qualification = $user->powerPlusQualifications()
+            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('date', 'desc')
+            ->first();
+        
+        if ($qualification && $qualification->leg_omzets) {
+            return response()->json([
+                'success' => true,
+                'leg_omzets' => $qualification->leg_omzets
+            ]);
+        }
+        
+        // Jika belum ada data, hitung langsung
+        $legOmzets = \App\Traits\Helper::calculateAllLegOmzetMonthly($user, $month);
+        
+        return response()->json([
+            'success' => true,
+            'leg_omzets' => $legOmzets
+        ]);
     }
 }

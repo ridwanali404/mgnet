@@ -1144,13 +1144,30 @@ trait Helper
             });
         
         foreach ($qualifiedUsers as $user) {
-            // Hitung omzet kiri dan kanan untuk bulan tersebut (akumulasi harian)
-            $leftOmzet = Helper::calculateLegOmzetMonthly($user, 'left', $month);
-            $rightOmzet = Helper::calculateLegOmzetMonthly($user, 'right', $month);
+            // Hitung omset per leg untuk bulan tersebut (akumulasi harian)
+            $legOmzets = Helper::calculateAllLegOmzetMonthly($user, $month);
+            
+            // Untuk backward compatibility, tetap simpan left_omzet dan right_omzet
+            // Ambil Leg 1 dan Leg 2 jika ada
+            $leftOmzet = $legOmzets['Leg 1'] ?? 0;
+            $rightOmzet = isset($legOmzets['Leg 2']) ? $legOmzets['Leg 2'] : 0;
             $smallerLegOmzet = min($leftOmzet, $rightOmzet);
             
-            $isQualified15k = $smallerLegOmzet >= 15000;
-            $isQualified30k = $smallerLegOmzet >= 30000;
+            // Logika qualification baru: minimal 2 grup dengan 15k-30k dan minimal 2 grup >=30k
+            // Bisa qualified di 2 kelompok sekaligus
+            $qualified15kGroups = 0; // Grup dengan omset 15.000 - 29.999
+            $qualified30kGroups = 0; // Grup dengan omset >= 30.000
+            
+            foreach ($legOmzets as $legName => $omzet) {
+                if ($omzet >= 30000) {
+                    $qualified30kGroups++;
+                } elseif ($omzet >= 15000) {
+                    $qualified15kGroups++;
+                }
+            }
+            
+            $isQualified15k = $qualified15kGroups >= 2; // Minimal 2 grup dengan 15k-30k
+            $isQualified30k = $qualified30kGroups >= 2; // Minimal 2 grup dengan >=30k
             
             // Simpan dengan tanggal akhir bulan
             PowerPlusQualification::updateOrCreate(
@@ -1162,6 +1179,7 @@ trait Helper
                     'left_omzet' => $leftOmzet,
                     'right_omzet' => $rightOmzet,
                     'smaller_leg_omzet' => $smallerLegOmzet,
+                    'leg_omzets' => json_encode($legOmzets),
                     'is_qualified_15k' => $isQualified15k,
                     'is_qualified_30k' => $isQualified30k,
                 ]
@@ -1268,6 +1286,68 @@ trait Helper
             
             // Recursive untuk downline
             $omzet += Helper::calculateLegOmzetMonthly($sponsor, $side, $month);
+        }
+        
+        return $omzet;
+    }
+
+    /**
+     * Hitung omset per leg untuk bulan tertentu (bulanan - akumulasi)
+     * Mengembalikan array dengan format: ["Leg 1" => 5000, "Leg 2" => 15500, "Leg 3" => 7000, ...]
+     * Semua leg diurutkan berdasarkan created_at (tidak ada Leg Kiri khusus)
+     */
+    public static function calculateAllLegOmzetMonthly($user, $month)
+    {
+        $date = DateTime::createFromFormat('Y-m', $month);
+        $startDate = $date->format('Y-m-01');
+        $endDate = $date->format('Y-m-t');
+        
+        // Ambil semua uplines berdasarkan urutan created_at
+        // Upline pertama = Leg 1, Upline kedua = Leg 2, dst
+        $allUplines = $user->uplines()
+            ->whereHas('premiumUserPin')
+            ->orderBy('created_at', 'asc')
+            ->get();
+        
+        $legOmzets = [];
+        
+        foreach ($allUplines as $index => $upline) {
+            // Leg 1 = index 0, Leg 2 = index 1, Leg 3 = index 2, dst
+            $legName = 'Leg ' . ($index + 1);
+            
+            // Hitung omset bulanan dari upline ini dan semua downline-nya
+            $omzet = Helper::calculateLegOmzetRecursive($upline, $startDate, $endDate);
+            
+            $legOmzets[$legName] = $omzet;
+        }
+        
+        return $legOmzets;
+    }
+
+    /**
+     * Hitung omset secara recursive untuk satu leg (termasuk semua downline-nya)
+     * Leg dihitung berdasarkan tree upline (semua downline yang berada di bawah leg ini)
+     */
+    private static function calculateLegOmzetRecursive($user, $startDate, $endDate)
+    {
+        $omzet = 0;
+        
+        // Hitung omzet bulanan dari user ini (akumulasi semua hari dalam bulan)
+        $monthlyPoins = $user->dailyPoins()
+            ->whereBetween('date', [$startDate, $endDate])
+            ->get();
+        
+        foreach ($monthlyPoins as $dailyPoin) {
+            $omzet += $dailyPoin->pp + $dailyPoin->pr;
+        }
+        
+        // Recursive untuk semua downline-nya (semua yang memiliki upline_id = user ini)
+        $downlines = $user->uplines()
+            ->whereHas('premiumUserPin')
+            ->get();
+        
+        foreach ($downlines as $downline) {
+            $omzet += Helper::calculateLegOmzetRecursive($downline, $startDate, $endDate);
         }
         
         return $omzet;
