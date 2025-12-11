@@ -102,11 +102,6 @@
                         {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}.
                     </div>
                 @endif
-            @else
-                <div class="alert alert-warning">Anda belum bisa mendapatkan bonus bulan
-                    {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }},
-                    silahkan lakukan belanja produk RO minimal sejumlah 39 PV. Poin anda saat ini sejumlah
-                    {{ number_format(Auth::user()->monthlyPoin(date('Y-m'))) }} PV</div>
             @endif
             <div class="row">
                 <div class="col-md-4">
@@ -1146,20 +1141,87 @@
                                         <tr>
                                             <th>#</th>
                                             <th>Tanggal</th>
-                                            <th class="text-right">Bonus (Rp)</th>
+                                            <th class="text-right">Poin</th>
                                             <th>Deskripsi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (Auth::user()->monthlyPowerPlusBonuses($month)->latest()->get() as $a)
-                                            <tr>
-                                                <td>{{ $loop->index + 1 }}</td>
-                                                <td><code>{{ $a->created_at }}</code></td>
-                                                <td class="text-right">
-                                                    <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
-                                                </td>
-                                                <td>{{ $a->description }}</td>
-                                            </tr>
+                                        @php
+                                            $bonuses = Auth::user()->monthlyPowerPlusBonuses($month)->latest()->get();
+                                            $counter = 1;
+                                        @endphp
+                                        @foreach ($bonuses as $bonus)
+                                            @php
+                                                // Cari qualification untuk bulan yang sama dengan bonus
+                                                $bonusDate = \Carbon\Carbon::parse($bonus->created_at);
+                                                $qualification = Auth::user()->powerPlusQualifications()
+                                                    ->whereYear('date', $bonusDate->year)
+                                                    ->whereMonth('date', $bonusDate->month)
+                                                    ->first();
+                                                
+                                                // Ambil semua uplines untuk mapping leg ke username
+                                                $allUplines = Auth::user()->uplines()
+                                                    ->whereHas('premiumUserPin')
+                                                    ->orderBy('created_at', 'asc')
+                                                    ->get();
+                                                
+                                                // Ambil informasi leg yang qualified
+                                                $legDetails = [];
+                                                if ($qualification && $qualification->leg_omzets) {
+                                                    foreach ($qualification->leg_omzets as $legName => $omzet) {
+                                                        if ($omzet >= 15000) {
+                                                            // Ambil username dari leg
+                                                            $legIndex = intval(str_replace('Leg ', '', $legName)) - 1;
+                                                            $legUser = $allUplines->get($legIndex);
+                                                            $legUsername = $legUser ? $legUser->username : '';
+                                                            
+                                                            // Ambil paket dari leg user
+                                                            $legPackage = $legUser && $legUser->premiumUserPin ? $legUser->premiumUserPin->pin->name : '';
+                                                            
+                                                            $legDetails[] = [
+                                                                'leg' => $legName,
+                                                                'username' => $legUsername,
+                                                                'package' => $legPackage,
+                                                                'omzet' => $omzet
+                                                            ];
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                // Jika ada leg details, tampilkan setiap leg sebagai baris terpisah
+                                                if (!empty($legDetails)) {
+                                                    foreach ($legDetails as $detail) {
+                                                        $description = '';
+                                                        if ($detail['package'] && $detail['username']) {
+                                                            $description = 'join ' . $detail['package'] . ' ' . $detail['username'];
+                                                        } else {
+                                                            $description = $bonus->description;
+                                                        }
+                                            @endphp
+                                                        <tr>
+                                                            <td>{{ $counter++ }}</td>
+                                                            <td><code>{{ $bonus->created_at->format('Y-m-d') }}</code></td>
+                                                            <td class="text-right">
+                                                                <code>{{ number_format($detail['omzet'], 0, ',', '.') }}</code>
+                                                            </td>
+                                                            <td>{{ $description }}</td>
+                                                        </tr>
+                                            @php
+                                                    }
+                                                } else {
+                                                    // Jika tidak ada leg details, tampilkan bonus biasa
+                                            @endphp
+                                                    <tr>
+                                                        <td>{{ $counter++ }}</td>
+                                                        <td><code>{{ $bonus->created_at->format('Y-m-d') }}</code></td>
+                                                        <td class="text-right">
+                                                            <code>0</code>
+                                                        </td>
+                                                        <td>{{ $bonus->description }}</td>
+                                                    </tr>
+                                            @php
+                                                }
+                                            @endphp
                                         @endforeach
                                     </tbody>
                                 </table>
@@ -1243,7 +1305,20 @@
                                                             <br><small class="text-muted">({{ $legUsernames[$legName] }})</small>
                                                         @endif
                                                     </td>
-                                                    <td class="text-center"><code class="font-weight-bold" style="font-size: 1.1em;">{{ number_format($omzet, 0, ',', '.') }}</code></td>
+                                                    <td class="text-center">
+                                                        @if($omzet > 0)
+                                                            <a href="javascript:void(0)" 
+                                                               class="leg-omzet-detail" 
+                                                               data-leg="{{ $legName }}"
+                                                               data-month="{{ $month }}"
+                                                               data-user-id="{{ Auth::user()->id }}"
+                                                               style="text-decoration: none; color: inherit; cursor: pointer;">
+                                                                <code class="font-weight-bold" style="font-size: 1.1em; color: #e91e63;">{{ number_format($omzet, 0, ',', '.') }}</code>
+                                                            </a>
+                                                        @else
+                                                            <code class="font-weight-bold" style="font-size: 1.1em;">{{ number_format($omzet, 0, ',', '.') }}</code>
+                                                        @endif
+                                                    </td>
                                                 </tr>
                                             @endforeach
                                         @else
@@ -1340,6 +1415,61 @@
                 document.getElementById("filter").submit();
             });
         });
+        
+        // Handle click pada angka omset leg
+        $(document).on('click', '.leg-omzet-detail', function() {
+            var legName = $(this).data('leg');
+            var month = $(this).data('month');
+            var userId = $(this).data('user-id') || {{ Auth::user()->id }};
+            
+            // Tampilkan loading
+            $('#leg-omzet-modal .modal-body').html('<div class="text-center"><i class="fa fa-spinner fa-spin"></i> Memuat data...</div>');
+            $('#leg-omzet-modal').modal('show');
+            
+            // Load data breakdown
+            $.get('/api/powerplus-leg-omzet-breakdown', {
+                user_id: userId,
+                leg_number: legName,
+                month: month,
+                
+            }, function(data) {
+                if (data.success) {
+                    var html = '<h5>Detail Omset ' + data.leg_name + ' (' + data.leg_username + ')</h5>';
+                    html += '<p class="text-muted">Total: <strong>' + parseInt(data.total_omzet).toLocaleString('id-ID') + ' Poin</strong></p>';
+                    html += '<hr>';
+                    html += '<div class="table-responsive">';
+                    html += '<table class="table table-sm table-hover">';
+                    html += '<thead><tr><th>#</th><th>Username</th><th>Nama</th><th class="text-right">Poin</th></tr></thead>';
+                    html += '<tbody>';
+                    
+                    if (data.breakdown && data.breakdown.length > 0) {
+                        $.each(data.breakdown, function(index, item) {
+                            html += '<tr>';
+                            html += '<td>' + (index + 1) + '</td>';
+                            html += '<td><code>' + item.username + '</code></td>';
+                            html += '<td>' + item.name + '</td>';
+                            html += '<td class="text-right"><strong>' + parseInt(item.poin).toLocaleString('id-ID') + '</strong></td>';
+                            html += '</tr>';
+                        });
+                    } else {
+                        html += '<tr><td colspan="4" class="text-center text-muted">Tidak ada data</td></tr>';
+                    }
+                    
+                    html += '</tbody></table></div>';
+                    $('#leg-omzet-modal .modal-body').html(html);
+                } else {
+                    $('#leg-omzet-modal .modal-body').html('<div class="alert alert-danger">' + (data.message || 'Gagal memuat data') + '</div>');
+                }
+            }).fail(function(xhr) {
+                var errorMessage = 'Gagal memuat data. Silakan coba lagi.';
+                if (xhr.status === 403) {
+                    errorMessage = 'Akses ditolak. Hanya admin yang dapat melihat detail breakdown omset leg.';
+                } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                $('#leg-omzet-modal .modal-body').html('<div class="alert alert-danger">' + errorMessage + '</div>');
+            });
+        });
     </script>
     @if (in_array(Auth::user()->type, ['admin', 'cradmin']))
         <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -1398,7 +1528,15 @@
                                         html += '<br><small class="text-muted">(' + username + ')</small>';
                                     }
                                     html += '</td>';
-                                    html += '<td class="text-center"><code class="font-weight-bold" style="font-size: 1.1em;">' + parseInt(omzet).toLocaleString('id-ID') + '</code></td>';
+                                    html += '<td class="text-center">';
+                                    if (omzet > 0) {
+                                        html += '<a href="javascript:void(0)" class="leg-omzet-detail" data-leg="' + legName + '" data-month="' + month + '" data-user-id="' + userId + '" style="text-decoration: none; color: inherit; cursor: pointer;">';
+                                        html += '<code class="font-weight-bold" style="font-size: 1.1em; color: #e91e63;">' + parseInt(omzet).toLocaleString('id-ID') + '</code>';
+                                        html += '</a>';
+                                    } else {
+                                        html += '<code class="font-weight-bold" style="font-size: 1.1em;">' + parseInt(omzet).toLocaleString('id-ID') + '</code>';
+                                    }
+                                    html += '</td>';
                                     html += '</tr>';
                                 });
                             } else {
@@ -1752,4 +1890,24 @@
             });
         </script>
     @endif
+
+    <!-- Modal untuk detail breakdown omset leg -->
+    <div class="modal fade" id="leg-omzet-modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detail Omset Grup</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Content akan diisi via JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection

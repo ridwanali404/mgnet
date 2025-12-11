@@ -1295,7 +1295,9 @@ trait Helper
      * Hitung omset per leg untuk bulan tertentu (bulanan - akumulasi)
      * Mengembalikan array dengan format: ["Leg 1" => 5000, "Leg 2" => 15500, "Leg 3" => 7000, ...]
      * Semua leg dihitung untuk Power Plus (tidak ada Leg Kiri yang dikecualikan)
-     * Catatan: Untuk omset grup leg, root leg (anggota leg itu sendiri) TIDAK dihitung, hanya downline-nya saja
+     * Catatan: Untuk omset grup leg, HANYA menghitung poin dari root leg (anggota leg itu sendiri) saja
+     * TIDAK ditambahkan dengan downline langsungnya atau downline lainnya
+     * Contoh: Omset grup Leg 1 (cobalagi2) = hanya poin cobalagi2 sendiri
      */
     public static function calculateAllLegOmzetMonthly($user, $month)
     {
@@ -1316,9 +1318,16 @@ trait Helper
             // Leg 1 = index 0, Leg 2 = index 1, Leg 3 = index 2, dst
             $legName = 'Leg ' . ($index + 1);
             
-            // Hitung omset bulanan dari downline leg ini saja (TIDAK termasuk root leg itu sendiri)
-            // Untuk omset grup, root leg tidak dihitung, hanya downline-nya
-            $omzet = Helper::calculateLegOmzetRecursive($upline, $startDate, $endDate, false);
+            // Hitung omset bulanan HANYA dari root leg ini saja (tidak ditambahkan dengan downline)
+            // Untuk omset grup, hanya gunakan poin dari root leg sendiri
+            $omzet = 0;
+            $monthlyPoins = $upline->dailyPoins()
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get();
+            
+            foreach ($monthlyPoins as $dailyPoin) {
+                $omzet += $dailyPoin->pp + $dailyPoin->pr;
+            }
             
             $legOmzets[$legName] = $omzet;
         }
@@ -1363,6 +1372,61 @@ trait Helper
         }
         
         return $omzet;
+    }
+
+    /**
+     * Dapatkan detail breakdown omset leg (siapa saja yang berkontribusi)
+     * 
+     * @param User $user User root leg
+     * @param string $month Bulan dalam format Y-m
+     * @return array Array berisi detail perhitungan: [['username' => '...', 'poin' => ...], ...]
+     */
+    public static function getLegOmzetBreakdown($user, $month)
+    {
+        $date = DateTime::createFromFormat('Y-m', $month);
+        $startDate = $date->format('Y-m-01');
+        $endDate = $date->format('Y-m-t');
+        
+        $breakdown = [];
+        Helper::getLegOmzetBreakdownRecursive($user, $startDate, $endDate, true, $breakdown);
+        
+        return $breakdown;
+    }
+
+    /**
+     * Helper recursive untuk mendapatkan breakdown omset leg
+     */
+    private static function getLegOmzetBreakdownRecursive($user, $startDate, $endDate, $includeRoot, &$breakdown)
+    {
+        $userPoin = 0;
+        
+        // Hitung omzet bulanan dari user ini
+        if ($includeRoot) {
+            $monthlyPoins = $user->dailyPoins()
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get();
+            
+            foreach ($monthlyPoins as $dailyPoin) {
+                $userPoin += $dailyPoin->pp + $dailyPoin->pr;
+            }
+            
+            if ($userPoin > 0) {
+                $breakdown[] = [
+                    'username' => $user->username,
+                    'name' => $user->name,
+                    'poin' => $userPoin
+                ];
+            }
+        }
+        
+        // Recursive untuk semua downline-nya
+        $downlines = $user->uplines()
+            ->whereHas('premiumUserPin')
+            ->get();
+        
+        foreach ($downlines as $downline) {
+            Helper::getLegOmzetBreakdownRecursive($downline, $startDate, $endDate, true, $breakdown);
+        }
     }
 
     /**

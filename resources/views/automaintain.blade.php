@@ -42,9 +42,16 @@
         @if (auth()->user()->type != 'admin')
             <div class="card">
                 <div class="card-body">
-                    <p class="text-muted">
-                        <strong>Automaintain</strong> Batasnya Bukan 2 juta tapi Rp 1,7 juta. Ketika terjadi Automaintain tercapai 1,7 juta, Bonus naik ke Uplinenya seperti ketika jika Dia mensponsori Gold..Hanya intinya tanpa Bonus Sponsor Saja.. jadi RO bisa lewat belanja, Maupun lewat Automaintain. Sama sih sistem ini kayak di BSM sebelumnya.
-                    </p>
+                    <h5 class="card-title">Keterangan Automaintain</h5>
+                    <div class="text-muted">
+                        <p><strong>Batas Automaintain:</strong> Rp 1.700.000</p>
+                        <p><strong>Cara Kerja:</strong> Ketika Automaintain mencapai Rp 1.700.000, bonus akan masuk ke Upline, sama seperti ketika mensponsori member Gold. Perbedaannya adalah tidak ada Bonus Sponsor.</p>
+                        <p><strong>RO (Repeat Order):</strong> Dapat dicapai melalui:</p>
+                        <ul>
+                            <li>Belanja produk</li>
+                            <li>Automaintain</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         @endif

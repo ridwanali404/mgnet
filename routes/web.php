@@ -202,7 +202,6 @@ Route::group(['middleware' => ['auth']], function () {
         Route::get('qualified/royalty', 'HomeController@royalty');
         Route::get('qualified', 'HomeController@qualified');
         Route::get('daily/pair', 'DailyProfitController@pair');
-        Route::get('api/powerplus-leg-omzet', 'ApiController@powerplusLegOmzet');
         Route::get('daily/pair-reward', 'DailyProfitController@pairReward');
         Route::get('pair/enable', 'PairController@enable')->name('pair.enable');
         Route::get('pair/disable', 'PairController@disable')->name('pair.disable');

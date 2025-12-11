@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class ApiController extends Controller
 {
@@ -225,6 +226,54 @@ class ApiController extends Controller
             'success' => true,
             'leg_omzets' => $completeLegOmzets,
             'leg_usernames' => $legUsernames
+        ]);
+    }
+
+    /**
+     * API untuk mendapatkan detail breakdown omset leg
+     * Hanya bisa diakses oleh admin
+     */
+    public function powerplusLegOmzetBreakdown(Request $request)
+    {
+        $userId = $request->input('user_id');
+        $legNumber = $request->input('leg_number'); // Leg 1, Leg 2, dst
+        $month = $request->input('month', date('Y-m'));
+        
+        $user = User::find($userId);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User tidak ditemukan'
+            ], 404);
+        }
+        
+        // Ambil semua uplines untuk menentukan leg
+        $allUplines = $user->uplines()
+            ->whereHas('premiumUserPin')
+            ->orderBy('created_at', 'asc')
+            ->get();
+        
+        // Parse leg number (Leg 1 -> index 0, Leg 2 -> index 1, dst)
+        $legIndex = intval(str_replace('Leg ', '', $legNumber)) - 1;
+        
+        if (!isset($allUplines[$legIndex])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Leg tidak ditemukan'
+            ], 404);
+        }
+        
+        $legUser = $allUplines[$legIndex];
+        
+        // Dapatkan breakdown detail
+        $breakdown = \App\Traits\Helper::getLegOmzetBreakdown($legUser, $month);
+        
+        return response()->json([
+            'success' => true,
+            'leg_name' => $legNumber,
+            'leg_username' => $legUser->username,
+            'total_omzet' => array_sum(array_column($breakdown, 'poin')),
+            'breakdown' => $breakdown
         ]);
     }
 }

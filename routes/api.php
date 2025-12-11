@@ -20,3 +20,5 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 
 Route::get('city', 'CityController@index');
 Route::get('monoleg', 'ApiController@monoleg');
+Route::get('powerplus-leg-omzet', 'ApiController@powerplusLegOmzet');
+Route::get('powerplus-leg-omzet-breakdown', 'ApiController@powerplusLegOmzetBreakdown');
