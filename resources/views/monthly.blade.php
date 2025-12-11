@@ -38,6 +38,14 @@
                             <a href="#" class="btn waves-effect waves-light btn-danger pull-right" data-toggle="modal"
                                 data-target=".closing"> Closing
                                 {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}</a>&nbsp;
+                        @else
+                            <form action="{{ route('monthly-closing.cancel') }}" method="POST" style="display: inline-block;" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan closing untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}? Tindakan ini akan: menghapus bonus Profit Sharing, mengembalikan masa aktif user, dan menghapus record closing.');">
+                                @csrf
+                                <input type="hidden" name="month" value="{{ $month }}" />
+                                <button type="submit" class="btn waves-effect waves-light btn-warning pull-right">
+                                    Batal Closing {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}
+                                </button>
+                            </form>&nbsp;
                         @endif
                     @endif
                 </div>
@@ -1173,16 +1181,19 @@
                                 $latestQualification = $powerPlusQualifications->first();
                                 
                                 // Ambil semua leg berdasarkan jumlah upline user (bukan dari qualification)
+                                // Semua leg dihitung untuk Power Plus (tidak ada Leg Kiri yang dikecualikan)
                                 $allUplines = Auth::user()->uplines()
                                     ->whereHas('premiumUserPin')
                                     ->orderBy('created_at', 'asc')
                                     ->get();
                                 
-                                // Buat array leg lengkap berdasarkan jumlah upline
+                                // Buat array leg lengkap berdasarkan jumlah upline dan mapping username
                                 $allLegs = [];
+                                $legUsernames = []; // Mapping leg name ke username
                                 foreach ($allUplines as $index => $upline) {
                                     $legName = 'Leg ' . ($index + 1);
                                     $allLegs[] = $legName;
+                                    $legUsernames[$legName] = $upline->username;
                                 }
                                 
                                 // Ambil leg_omzets dari latest qualification atau hitung langsung
@@ -1226,7 +1237,12 @@
                                         @if(!empty($legOmzets))
                                             @foreach($legOmzets as $legName => $omzet)
                                                 <tr>
-                                                    <td class="text-center"><strong>{{ $legName }}</strong></td>
+                                                    <td class="text-center">
+                                                        <strong>{{ $legName }}</strong>
+                                                        @if(isset($legUsernames[$legName]))
+                                                            <br><small class="text-muted">({{ $legUsernames[$legName] }})</small>
+                                                        @endif
+                                                    </td>
                                                     <td class="text-center"><code class="font-weight-bold" style="font-size: 1.1em;">{{ number_format($omzet, 0, ',', '.') }}</code></td>
                                                 </tr>
                                             @endforeach
@@ -1374,8 +1390,14 @@
                             if (legNames.length > 0) {
                                 $.each(legNames, function(index, legName) {
                                     var omzet = data.leg_omzets[legName] || 0;
+                                    var username = (data.leg_usernames && data.leg_usernames[legName]) ? data.leg_usernames[legName] : '';
                                     html += '<tr>';
-                                    html += '<td class="text-center"><strong>' + legName + '</strong></td>';
+                                    html += '<td class="text-center">';
+                                    html += '<strong>' + legName + '</strong>';
+                                    if (username) {
+                                        html += '<br><small class="text-muted">(' + username + ')</small>';
+                                    }
+                                    html += '</td>';
                                     html += '<td class="text-center"><code class="font-weight-bold" style="font-size: 1.1em;">' + parseInt(omzet).toLocaleString('id-ID') + '</code></td>';
                                     html += '</tr>';
                                 });

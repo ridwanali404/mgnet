@@ -1294,7 +1294,8 @@ trait Helper
     /**
      * Hitung omset per leg untuk bulan tertentu (bulanan - akumulasi)
      * Mengembalikan array dengan format: ["Leg 1" => 5000, "Leg 2" => 15500, "Leg 3" => 7000, ...]
-     * Semua leg diurutkan berdasarkan created_at (tidak ada Leg Kiri khusus)
+     * Semua leg dihitung untuk Power Plus (tidak ada Leg Kiri yang dikecualikan)
+     * Catatan: Untuk omset grup leg, root leg (anggota leg itu sendiri) TIDAK dihitung, hanya downline-nya saja
      */
     public static function calculateAllLegOmzetMonthly($user, $month)
     {
@@ -1315,8 +1316,9 @@ trait Helper
             // Leg 1 = index 0, Leg 2 = index 1, Leg 3 = index 2, dst
             $legName = 'Leg ' . ($index + 1);
             
-            // Hitung omset bulanan dari upline ini dan semua downline-nya
-            $omzet = Helper::calculateLegOmzetRecursive($upline, $startDate, $endDate);
+            // Hitung omset bulanan dari downline leg ini saja (TIDAK termasuk root leg itu sendiri)
+            // Untuk omset grup, root leg tidak dihitung, hanya downline-nya
+            $omzet = Helper::calculateLegOmzetRecursive($upline, $startDate, $endDate, false);
             
             $legOmzets[$legName] = $omzet;
         }
@@ -1325,29 +1327,39 @@ trait Helper
     }
 
     /**
-     * Hitung omset secara recursive untuk satu leg (termasuk semua downline-nya)
+     * Hitung omset secara recursive untuk satu leg
      * Leg dihitung berdasarkan tree upline (semua downline yang berada di bawah leg ini)
+     * 
+     * @param User $user User yang akan dihitung omsetnya
+     * @param string $startDate Tanggal mulai (format: Y-m-d)
+     * @param string $endDate Tanggal akhir (format: Y-m-d)
+     * @param bool $includeRoot Apakah root (user itu sendiri) harus dihitung. Default true untuk backward compatibility
+     * @return int Total omset
      */
-    private static function calculateLegOmzetRecursive($user, $startDate, $endDate)
+    private static function calculateLegOmzetRecursive($user, $startDate, $endDate, $includeRoot = true)
     {
         $omzet = 0;
         
         // Hitung omzet bulanan dari user ini (akumulasi semua hari dalam bulan)
-        $monthlyPoins = $user->dailyPoins()
-            ->whereBetween('date', [$startDate, $endDate])
-            ->get();
-        
-        foreach ($monthlyPoins as $dailyPoin) {
-            $omzet += $dailyPoin->pp + $dailyPoin->pr;
+        // Hanya hitung jika includeRoot = true
+        if ($includeRoot) {
+            $monthlyPoins = $user->dailyPoins()
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get();
+            
+            foreach ($monthlyPoins as $dailyPoin) {
+                $omzet += $dailyPoin->pp + $dailyPoin->pr;
+            }
         }
         
         // Recursive untuk semua downline-nya (semua yang memiliki upline_id = user ini)
+        // Untuk downline, selalu hitung omset mereka (includeRoot = true)
         $downlines = $user->uplines()
             ->whereHas('premiumUserPin')
             ->get();
         
         foreach ($downlines as $downline) {
-            $omzet += Helper::calculateLegOmzetRecursive($downline, $startDate, $endDate);
+            $omzet += Helper::calculateLegOmzetRecursive($downline, $startDate, $endDate, true);
         }
         
         return $omzet;

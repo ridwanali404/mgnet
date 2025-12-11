@@ -14,6 +14,7 @@ use App\Models\OfficialTransaction;
 use Carbon\Carbon;
 use App\Traits\Helper;
 use App\Models\DailyPoin;
+use App\Models\ProfitSharing;
 
 class MonthlyClosingController extends Controller
 {
@@ -217,6 +218,169 @@ class MonthlyClosingController extends Controller
     public function destroy(MonthlyClosing $monthlyClosing)
     {
         //
+    }
+
+    /**
+     * Cancel monthly closing untuk bulan tertentu
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function cancel(Request $request)
+    {
+        ini_set('max_execution_time', '-1');
+        ini_set('memory_limit', '-1');
+        $month = $request->month;
+        $date = DateTime::createFromFormat('Y-m', $month);
+
+        // Check if closing exists
+        $closing = MonthlyClosing::whereYear('created_at', $date->format('Y'))
+            ->whereMonth('created_at', $date->format('m'))
+            ->first();
+
+        if (!$closing) {
+            Session::flash('fail', 'Closing untuk bulan ' . $month . ' tidak ditemukan');
+            return back();
+        }
+
+        try {
+            \DB::beginTransaction();
+
+            // 1. Reverse active status extension untuk user yang qualified RO
+            // Cari user yang mendapat extendActiveStatus dengan method 'ro_qualified' pada bulan tersebut
+            // Kita perlu mencari user yang active_until diperpanjang sekitar waktu closing
+            // Karena kita tidak track method extend, kita akan mencari user yang qualified RO pada bulan tersebut
+            // dan kurangi 45 hari dari active_until mereka
+            
+            // Cari user yang qualified RO (sama seperti di store method)
+            $allUsers = User::whereHas('userPin', function ($q) {
+                $q->whereHas('pin', function ($q_pin) {
+                    $q_pin->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
+                });
+            })->get();
+            
+            $roQualifiedUsers = collect();
+            foreach ($allUsers as $user) {
+                if (!$user->active_until) {
+                    continue;
+                }
+                
+                $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
+                $activeUntil = Carbon::parse($user->active_until);
+                
+                $monthStart = $date->format('Y-m-01');
+                $monthEnd = $date->format('Y-m-t');
+                $checkFrom = max($activeFrom->format('Y-m-d'), $monthStart);
+                $checkUntil = min($activeUntil->format('Y-m-d'), $monthEnd);
+                
+                $transactionPoin = Transaction::where('user_id', $user->id)
+                    ->where('type', 'general')
+                    ->where('poin', '>', 0)
+                    ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+                    ->whereBetween('created_at', [$checkFrom . ' 00:00:00', $checkUntil . ' 23:59:59'])
+                    ->sum('poin');
+                
+                $officialPoin = OfficialTransaction::where('user_id', $user->id)
+                    ->where('poin', '>', 0)
+                    ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+                    ->whereBetween('created_at', [$checkFrom . ' 00:00:00', $checkUntil . ' 23:59:59'])
+                    ->sum('poin');
+                
+                $dailyPoinPV = $user->dailyPoins()
+                    ->where('pv', '>', 0)
+                    ->whereBetween('date', [$checkFrom, $checkUntil])
+                    ->sum('pv');
+                
+                $totalPVInActive = $transactionPoin + $officialPoin + $dailyPoinPV;
+                
+                if ($totalPVInActive >= 170) {
+                    $roQualifiedUsers->push($user);
+                }
+            }
+            
+            // Cek user automaintain
+            $automaintainUsers = User::whereHas('userPins', function ($q) use ($date) {
+                $q->whereHas('pin', function ($q_pin) {
+                    $q_pin->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
+                })
+                ->where('is_ro', true)
+                ->where('is_used', true)
+                ->whereYear('created_at', $date->format('Y'))
+                ->whereMonth('created_at', $date->format('m'));
+            })->get();
+            
+            $allROUsers = $roQualifiedUsers->merge($automaintainUsers)->unique('id');
+            
+            // Reverse active status extension (kurangi 45 hari)
+            foreach ($allROUsers as $user) {
+                if ($user->active_until) {
+                    $newActiveUntil = Carbon::parse($user->active_until)->subDays(45);
+                    // Pastikan tidak kurang dari tanggal awal aktif
+                    $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
+                    if ($newActiveUntil->lt($activeFrom)) {
+                        $newActiveUntil = $activeFrom;
+                    }
+                    
+                    $user->update([
+                        'active_until' => $newActiveUntil,
+                        'is_active' => $newActiveUntil->gte(Carbon::now()) ? true : false,
+                    ]);
+                }
+            }
+
+            // 2. Restore wallet_cashback dari bonus Profit Sharing sebelum menghapus bonus
+            // Karena ada bug di payoutProfitSharing (monthly_total diset setelah wallet_cashback direset),
+            // kita restore dari jumlah bonus yang dibuat
+            $profitSharingBonuses = Bonus::where('type', 'Bonus Profit Sharing')
+                ->whereYear('created_at', $date->format('Y'))
+                ->whereMonth('created_at', $date->format('m'))
+                ->where('description', 'like', '%Bonus Profit Sharing 5% untuk bulan ' . $month . '%')
+                ->get();
+            
+            // Group by user dan restore wallet_cashback
+            foreach ($profitSharingBonuses as $bonus) {
+                $user = $bonus->user;
+                if ($user) {
+                    $profitSharing = $user->profitSharings()->where('is_perdana_platinum', true)->first();
+                    if ($profitSharing) {
+                        // Restore wallet_cashback dengan menambahkan kembali jumlah bonus
+                        // Perlu di-capped di 22.500.000 sesuai dengan batas maksimal
+                        $newWalletCashback = min($profitSharing->wallet_cashback + $bonus->amount, 22500000);
+                        $profitSharing->update([
+                            'wallet_cashback' => $newWalletCashback,
+                            'monthly_total' => 0, // Reset monthly_total
+                        ]);
+                    }
+                }
+            }
+
+            // 3. Hapus bonus Profit Sharing yang dibuat saat closing
+            Bonus::where('type', 'Bonus Profit Sharing')
+                ->whereYear('created_at', $date->format('Y'))
+                ->whereMonth('created_at', $date->format('m'))
+                ->where('description', 'like', '%Bonus Profit Sharing 5% untuk bulan ' . $month . '%')
+                ->delete();
+
+            // 4. Hapus bonus Power Plus yang dibuat saat closing (jika ada)
+            // Power Plus biasanya dibuat dengan created_at pada tanggal akhir bulan
+            Bonus::where('type', 'Bonus Power Plus')
+                ->whereYear('created_at', $date->format('Y'))
+                ->whereMonth('created_at', $date->format('m'))
+                ->where('description', 'like', '%bulan ' . $month . '%')
+                ->delete();
+
+            // 5. Hapus record MonthlyClosing
+            $closing->delete();
+
+            \DB::commit();
+
+            Session::flash('success', 'Closing untuk bulan ' . $month . ' berhasil dibatalkan');
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            Session::flash('fail', 'Error saat membatalkan closing: ' . $e->getMessage());
+        }
+
+        return back();
     }
 
     public function poin()

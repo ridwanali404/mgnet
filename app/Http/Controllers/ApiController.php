@@ -193,16 +193,19 @@ class ApiController extends Controller
             ->first();
         
         // Ambil semua uplines untuk menentukan jumlah leg
+        // Semua leg dihitung untuk Power Plus (tidak ada Leg Kiri yang dikecualikan)
         $allUplines = $user->uplines()
             ->whereHas('premiumUserPin')
             ->orderBy('created_at', 'asc')
             ->get();
         
-        // Buat array leg lengkap berdasarkan jumlah upline
+        // Buat array leg lengkap berdasarkan jumlah upline dan mapping username
         $completeLegOmzets = [];
+        $legUsernames = []; // Mapping leg name ke username
         foreach ($allUplines as $index => $upline) {
             $legName = 'Leg ' . ($index + 1);
             $completeLegOmzets[$legName] = 0; // Default 0
+            $legUsernames[$legName] = $upline->username;
         }
         
         // Jika ada qualification, gunakan data dari qualification
@@ -220,7 +223,8 @@ class ApiController extends Controller
         
         return response()->json([
             'success' => true,
-            'leg_omzets' => $completeLegOmzets
+            'leg_omzets' => $completeLegOmzets,
+            'leg_usernames' => $legUsernames
         ]);
     }
 }

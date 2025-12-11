@@ -185,6 +185,7 @@ Route::group(['middleware' => ['auth']], function () {
         Route::put('stockist-master/{user}/area', 'UserController@areaMasterStockist')->name('masterStockist.area');
         Route::resource('news', 'NewsController');
         Route::resource('monthly-closing', 'MonthlyClosingController');
+        Route::post('monthly-closing/cancel', 'MonthlyClosingController@cancel')->name('monthly-closing.cancel');
         Route::post('daily-closing', 'PairController@daily')->name('daily-closing.store');
         Route::get('stockist-area', 'UserController@stockistArea')->name('stockist.area');
         Route::get('admin', 'UserController@admin');
