@@ -277,6 +277,12 @@
                                         class="mdi mdi-star"></i><span class="hide-menu">Peringkat</span></a>
                             </li>
                         @endif
+                        @if (auth()->user()->type == 'admin' || auth()->user()->type == 'member')
+                            <li class="{{ Route::is('userTrip.index') ? 'active' : '' }}">
+                                <a href="{{ route('userTrip.index') }}" aria-expanded="false"><i
+                                        class="mdi mdi-airplane"></i><span class="hide-menu">Trip</span></a>
+                            </li>
+                        @endif
                         @if (auth()->user()->type == 'admin')
                             <li class="nav-devider"></li>
                             <li class="nav-small-cap">BELANJA ONLINE</li>

@@ -25,6 +25,7 @@ use App\Models\PowerPlusQualification;
 use App\Models\ProfitSharing;
 use App\Models\ProfitSharingDaily;
 use App\Models\UmrohTripSaving;
+use App\Models\UmrohTripDaily;
 use Illuminate\Support\Facades\Mail;
 
 trait Helper
@@ -672,6 +673,50 @@ trait Helper
             ->sum('poin');
         $gdp = GlobalDailyPoin::whereYear('date', $date->format('Y'))->whereMonth('date', $date->format('m'))
             ->sum('pv');
+        return $t + $ot + $gdp;
+    }
+
+    /**
+     * Hitung total poin transaksi harian (untuk omset harian)
+     * @param DateTime|string $date Tanggal dalam format Y-m-d atau DateTime object
+     * @return int Total poin untuk hari tersebut
+     */
+    public static function transactionPoinDaily($date)
+    {
+        // Convert string to DateTime if needed
+        if (is_string($date)) {
+            $dateObj = DateTime::createFromFormat('Y-m-d', $date);
+            if (!$dateObj) {
+                return 0;
+            }
+        } else {
+            $dateObj = $date;
+        }
+        
+        $dateStr = $dateObj->format('Y-m-d');
+        
+        // Cek apakah menggunakan Poin model
+        if (KeyValue::where('key', 'poin')->value('value') == 'enable') {
+            $poin = Poin::whereDate('date', $dateStr)->first();
+            if ($poin) {
+                return $poin->poin;
+            }
+        }
+        
+        // Hitung dari Transaction (harian)
+        $t = Transaction::whereDate('created_at', $dateStr)
+            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+            ->sum('poin');
+        
+        // Hitung dari OfficialTransaction (harian)
+        $ot = OfficialTransaction::whereDate('created_at', $dateStr)
+            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+            ->sum('poin');
+        
+        // Hitung dari GlobalDailyPoin (harian)
+        $gdp = GlobalDailyPoin::whereDate('date', $dateStr)
+            ->sum('pv');
+        
         return $t + $ot + $gdp;
     }
 
@@ -1443,9 +1488,9 @@ trait Helper
         
         $year = date('Y', strtotime($date));
         
-        // Hitung 4% dari omzet perusahaan
-        $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000;
-        $umrohAmount = round($totalOmzet * 0.04);
+        // Hitung 4% dari omzet perusahaan (harian)
+        $totalOmzet = Helper::transactionPoinDaily($date) * 1000;
+        $totalUmrohAmount = round($totalOmzet * 0.04);
         
         // Dapatkan semua user yang memiliki minimal 3 sponsor langsung (premium dan aktif)
         $qualifiedUsers = User::whereHas('premiumUserPin', function ($q) {
@@ -1468,7 +1513,26 @@ trait Helper
             return $sponsorCount >= 3;
         });
         
+        // Hitung jumlah per member: 4% x Omset Nasional : Member Yg qualified
+        $qualifiedCount = $qualifiedUsers->count();
+        if ($qualifiedCount > 0) {
+            $umrohAmountPerMember = round($totalUmrohAmount / $qualifiedCount);
+        } else {
+            $umrohAmountPerMember = 0;
+        }
+        
         foreach ($qualifiedUsers as $user) {
+            // Simpan data harian
+            UmrohTripDaily::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'date' => $date,
+                ],
+                [
+                    'amount' => $umrohAmountPerMember,
+                ]
+            );
+            
             $umrohSaving = UmrohTripSaving::firstOrCreate(
                 [
                     'user_id' => $user->id,
@@ -1489,7 +1553,7 @@ trait Helper
             );
             
             // Tambahkan akumulasi (maksimal 50.000.000 per tahun)
-            $newAccumulation = min($umrohSaving->yearly_accumulation + $umrohAmount, 50000000);
+            $newAccumulation = min($umrohSaving->yearly_accumulation + $umrohAmountPerMember, 50000000);
             $umrohSaving->update([
                 'yearly_accumulation' => $newAccumulation,
             ]);

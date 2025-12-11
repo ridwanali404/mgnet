@@ -239,7 +239,7 @@
                 "order": [[1, "desc"]],
                 "pageLength": 25,
                 "language": {
-                    "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
+                    "url": "https://cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
                 }
             });
             
@@ -247,7 +247,7 @@
                 "order": [[1, "desc"]],
                 "pageLength": 25,
                 "language": {
-                    "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
+                    "url": "https://cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
                 }
             });
         });

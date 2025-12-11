@@ -242,6 +242,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::resource('userAward', 'UserAwardController');
     Route::resource('rank', 'RankController');
     Route::resource('userRank', 'UserRankController');
+    Route::resource('userTrip', 'UserTripController');
+    Route::post('userTrip/generate', 'UserTripController@generate')->name('userTrip.generate');
 });
 
 // api
