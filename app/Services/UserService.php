@@ -157,7 +157,7 @@ class UserService
         
         // Cek apakah Platinum aktif
         if (!$user->is_active) {
-            return false;
+        return false;
         }
         
         return true;

@@ -558,7 +558,7 @@ class User extends Authenticatable
                 $q1->where('is_ro', false)
                     ->orWhere(function ($q2) {
                         $q2->where('is_ro', true)->where('is_used', true);
-                    });
+                });
             });
             $q->whereDate('updated_at', $date);
         });

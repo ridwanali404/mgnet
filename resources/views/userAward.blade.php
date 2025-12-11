@@ -46,8 +46,8 @@
                 }
                 $percentage = 0;
                 if ($nextAward && $nextAward->nominal > 0) {
-                    $percentage = round(($cash / $nextAward->nominal) * 100, 2);
-                    $percentage = min($percentage, 100);
+                $percentage = round(($cash / $nextAward->nominal) * 100, 2);
+                $percentage = min($percentage, 100);
                 }
             @endphp
             <div class="card table-responsive">

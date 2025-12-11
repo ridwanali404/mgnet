@@ -65,7 +65,7 @@ class MonthlyClosingController extends Controller
         $allUsers = User::whereHas('userPin', function ($q) {
             $q->whereHas('pin', function ($q_pin) {
                 $q_pin->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
-            });
+        });
         })->get();
         
         $roQualifiedUsers = collect();
@@ -87,8 +87,8 @@ class MonthlyClosingController extends Controller
             
             // Hitung PV dari transaksi dalam masa aktif bulan tersebut
             $transactionPoin = Transaction::where('user_id', $user->id)
-                ->where('type', 'general')
-                ->where('poin', '>', 0)
+            ->where('type', 'general')
+            ->where('poin', '>', 0)
                 ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
                 ->whereBetween('created_at', [$checkFrom . ' 00:00:00', $checkUntil . ' 23:59:59'])
                 ->sum('poin');
@@ -96,7 +96,7 @@ class MonthlyClosingController extends Controller
             // Hitung PV dari official transaction dalam masa aktif bulan tersebut
             $officialPoin = OfficialTransaction::where('user_id', $user->id)
                 ->where('poin', '>', 0)
-                ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
                 ->whereBetween('created_at', [$checkFrom . ' 00:00:00', $checkUntil . ' 23:59:59'])
                 ->sum('poin');
             
@@ -155,7 +155,7 @@ class MonthlyClosingController extends Controller
                     ->delete();
             }
         }
-        
+
         // Untuk user yang qualified, bonus generasi tetap ada (potensi terpenuhi)
         // Tambah 45 hari masa aktif untuk user yang qualified
         foreach ($allROUsers as $user) {

@@ -192,19 +192,35 @@ class ApiController extends Controller
             ->orderBy('date', 'desc')
             ->first();
         
-        if ($qualification && $qualification->leg_omzets) {
-            return response()->json([
-                'success' => true,
-                'leg_omzets' => $qualification->leg_omzets
-            ]);
+        // Ambil semua uplines untuk menentukan jumlah leg
+        $allUplines = $user->uplines()
+            ->whereHas('premiumUserPin')
+            ->orderBy('created_at', 'asc')
+            ->get();
+        
+        // Buat array leg lengkap berdasarkan jumlah upline
+        $completeLegOmzets = [];
+        foreach ($allUplines as $index => $upline) {
+            $legName = 'Leg ' . ($index + 1);
+            $completeLegOmzets[$legName] = 0; // Default 0
         }
         
-        // Jika belum ada data, hitung langsung
-        $legOmzets = \App\Traits\Helper::calculateAllLegOmzetMonthly($user, $month);
+        // Jika ada qualification, gunakan data dari qualification
+        if ($qualification && $qualification->leg_omzets) {
+            foreach ($qualification->leg_omzets as $legName => $omzet) {
+                $completeLegOmzets[$legName] = $omzet;
+            }
+        } else {
+            // Jika belum ada data, hitung langsung
+            $legOmzets = \App\Traits\Helper::calculateAllLegOmzetMonthly($user, $month);
+            foreach ($legOmzets as $legName => $omzet) {
+                $completeLegOmzets[$legName] = $omzet;
+            }
+        }
         
         return response()->json([
             'success' => true,
-            'leg_omzets' => $legOmzets
+            'leg_omzets' => $completeLegOmzets
         ]);
     }
 }
