@@ -266,7 +266,7 @@ class UserController extends Controller
             'username' => 'required|unique:users,username,' . $user->id,
         ]);
         $rr = $request->all();
-        if ($rr['password'] == null) {
+        if (!isset($rr['password']) || $rr['password'] == null || $rr['password'] == '') {
             unset($rr['password']);
         } else {
             $rr['password'] = bcrypt($rr['password']);

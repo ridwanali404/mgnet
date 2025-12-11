@@ -272,7 +272,6 @@ class ApiController extends Controller
             'success' => true,
             'leg_name' => $legNumber,
             'leg_username' => $legUser->username,
-            'total_omzet' => array_sum(array_column($breakdown, 'poin')),
             'breakdown' => $breakdown
         ]);
     }

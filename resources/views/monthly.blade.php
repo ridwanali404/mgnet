@@ -14,6 +14,24 @@
         .spinner-border.spinner-border-sm {
             margin-bottom: 2px;
         }
+        
+        .scroll-to-omset {
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .scroll-to-omset:hover {
+            opacity: 0.7;
+            transform: translateY(2px);
+        }
+        
+        .scroll-to-omset:hover .mdi-arrow-down {
+            color: #1976d2 !important;
+        }
+        
+        .scroll-to-omset:hover small {
+            color: #1976d2 !important;
+        }
     </style>
 @endsection
 @php
@@ -136,7 +154,10 @@
                                                title="Belum ada data omset grup untuk bulan ini"></i>
                                         @endif
                                     </h5>
-                                    <small class="text-muted">Bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}</small>
+                                    <a href="#omset-grup-powerplus" class="scroll-to-omset" style="text-decoration: none; color: inherit; cursor: pointer;">
+                                        <i class="mdi mdi-arrow-down text-muted" style="font-size: 14px;"></i>
+                                        <small class="text-muted">Lihat detail di bawah</small>
+                                    </a>
                                 </div>
                             </div>
                             @if($hasData)
@@ -852,6 +873,38 @@
                                     </code>
                                 </td>
                             </tr>
+                            <tr>
+                                <td>
+                                    Bonus Power Plus
+                                    <div>
+                                        <small class="form-text text-muted">
+                                            Total bonus Power Plus
+                                            {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}
+                                        </small>
+                                    </div>
+                                </td>
+                                <td class="text-right">
+                                    <code id="power-plus">
+                                        {{ number_format(Auth::user()->monthlyPowerPlusBonuses($month)->sum('amount'),0,',','.') }}
+                                    </code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    Bonus Global Profit Sharing
+                                    <div>
+                                        <small class="form-text text-muted">
+                                            Total bonus Global Profit Sharing
+                                            {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}
+                                        </small>
+                                    </div>
+                                </td>
+                                <td class="text-right">
+                                    <code id="profit-sharing">
+                                        {{ number_format(Auth::user()->monthlyProfitSharingBonuses($month)->sum('amount'),0,',','.') }}
+                                    </code>
+                                </td>
+                            </tr>
                             {{-- Bonus Unilevel RO dan Bonus Bulanan Poin Sharing 13% sudah dihilangkan --}}
                             {{-- 
                             <tr>
@@ -1141,94 +1194,27 @@
                                         <tr>
                                             <th>#</th>
                                             <th>Tanggal</th>
-                                            <th class="text-right">Poin</th>
+                                            <th class="text-right">Bonus (Rp)</th>
                                             <th>Deskripsi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @php
-                                            $bonuses = Auth::user()->monthlyPowerPlusBonuses($month)->latest()->get();
-                                            $counter = 1;
-                                        @endphp
-                                        @foreach ($bonuses as $bonus)
-                                            @php
-                                                // Cari qualification untuk bulan yang sama dengan bonus
-                                                $bonusDate = \Carbon\Carbon::parse($bonus->created_at);
-                                                $qualification = Auth::user()->powerPlusQualifications()
-                                                    ->whereYear('date', $bonusDate->year)
-                                                    ->whereMonth('date', $bonusDate->month)
-                                                    ->first();
-                                                
-                                                // Ambil semua uplines untuk mapping leg ke username
-                                                $allUplines = Auth::user()->uplines()
-                                                    ->whereHas('premiumUserPin')
-                                                    ->orderBy('created_at', 'asc')
-                                                    ->get();
-                                                
-                                                // Ambil informasi leg yang qualified
-                                                $legDetails = [];
-                                                if ($qualification && $qualification->leg_omzets) {
-                                                    foreach ($qualification->leg_omzets as $legName => $omzet) {
-                                                        if ($omzet >= 15000) {
-                                                            // Ambil username dari leg
-                                                            $legIndex = intval(str_replace('Leg ', '', $legName)) - 1;
-                                                            $legUser = $allUplines->get($legIndex);
-                                                            $legUsername = $legUser ? $legUser->username : '';
-                                                            
-                                                            // Ambil paket dari leg user
-                                                            $legPackage = $legUser && $legUser->premiumUserPin ? $legUser->premiumUserPin->pin->name : '';
-                                                            
-                                                            $legDetails[] = [
-                                                                'leg' => $legName,
-                                                                'username' => $legUsername,
-                                                                'package' => $legPackage,
-                                                                'omzet' => $omzet
-                                                            ];
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // Jika ada leg details, tampilkan setiap leg sebagai baris terpisah
-                                                if (!empty($legDetails)) {
-                                                    foreach ($legDetails as $detail) {
-                                                        $description = '';
-                                                        if ($detail['package'] && $detail['username']) {
-                                                            $description = 'join ' . $detail['package'] . ' ' . $detail['username'];
-                                                        } else {
-                                                            $description = $bonus->description;
-                                                        }
-                                            @endphp
-                                                        <tr>
-                                                            <td>{{ $counter++ }}</td>
-                                                            <td><code>{{ $bonus->created_at->format('Y-m-d') }}</code></td>
-                                                            <td class="text-right">
-                                                                <code>{{ number_format($detail['omzet'], 0, ',', '.') }}</code>
-                                                            </td>
-                                                            <td>{{ $description }}</td>
-                                                        </tr>
-                                            @php
-                                                    }
-                                                } else {
-                                                    // Jika tidak ada leg details, tampilkan bonus biasa
-                                            @endphp
-                                                    <tr>
-                                                        <td>{{ $counter++ }}</td>
-                                                        <td><code>{{ $bonus->created_at->format('Y-m-d') }}</code></td>
-                                                        <td class="text-right">
-                                                            <code>0</code>
-                                                        </td>
-                                                        <td>{{ $bonus->description }}</td>
-                                                    </tr>
-                                            @php
-                                                }
-                                            @endphp
+                                        @foreach (Auth::user()->monthlyPowerPlusBonuses($month)->latest()->get() as $a)
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
+                                                <td><code>{{ $a->created_at->format('Y-m-d') }}</code></td>
+                                                <td class="text-right">
+                                                    <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
+                                                </td>
+                                                <td>{{ $a->description }}</td>
+                                            </tr>
                                         @endforeach
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card" id="omset-grup-powerplus">
                         <div class="card-body">
                             <h4 class="card-title">Omset Grup Powerplus</h4>
                             <h6 class="card-subtitle">Omset grup powerplus untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}</h6>
@@ -1414,8 +1400,19 @@
             $("#month").on('change', function() {
                 document.getElementById("filter").submit();
             });
+            
+            // Smooth scroll ke bagian Omset Grup Powerplus
+            $('.scroll-to-omset').on('click', function(e) {
+                e.preventDefault();
+                var target = $('#omset-grup-powerplus');
+                if (target.length) {
+                    $('html, body').animate({
+                        scrollTop: target.offset().top - 100 // Offset 100px dari atas
+                    }, 800); // Durasi 800ms untuk smooth scroll
+                }
+            });
         });
-        
+
         // Handle click pada angka omset leg
         $(document).on('click', '.leg-omzet-detail', function() {
             var legName = $(this).data('leg');
@@ -1435,7 +1432,7 @@
             }, function(data) {
                 if (data.success) {
                     var html = '<h5>Detail Omset ' + data.leg_name + ' (' + data.leg_username + ')</h5>';
-                    html += '<p class="text-muted">Total: <strong>' + parseInt(data.total_omzet).toLocaleString('id-ID') + ' Poin</strong></p>';
+                    html += '<p class="text-muted">Kolom poin adalah akumulasi poin dari semua downline</strong></p>';
                     html += '<hr>';
                     html += '<div class="table-responsive">';
                     html += '<table class="table table-sm table-hover">';
@@ -1708,6 +1705,20 @@
                         cashback = 0;
                     }
                     
+                    // Parse power plus dengan handle error
+                    var powerPlusText = $('#power-plus').length > 0 ? $('#power-plus').text().replace(/\./g, "").replace(/\s/g, "").replace(/[^\d]/g, "") : "0";
+                    var powerPlus = parseFloat(powerPlusText);
+                    if (isNaN(powerPlus)) {
+                        powerPlus = 0;
+                    }
+                    
+                    // Parse profit sharing dengan handle error
+                    var profitSharingText = $('#profit-sharing').length > 0 ? $('#profit-sharing').text().replace(/\./g, "").replace(/\s/g, "").replace(/[^\d]/g, "") : "0";
+                    var profitSharing = parseFloat(profitSharingText);
+                    if (isNaN(profitSharing)) {
+                        profitSharing = 0;
+                    }
+                    
                     // Parse potency dengan handle error - hanya ambil angka, hilangkan HTML
                     var potencyText = "0";
                     if ($('#potency').length > 0) {
@@ -1723,8 +1734,8 @@
                         potency = 0;
                     }
                     
-                    // Hitung sum
-                    var sum = cashback + potency;
+                    // Hitung sum: Komisi Penjualan + Bonus Power Plus + Bonus Global Profit Sharing
+                    var sum = cashback + powerPlus + profitSharing;
                     
                     // Handle NaN
                     if (isNaN(sum)) {
