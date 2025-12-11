@@ -56,186 +56,112 @@ class MonthlyClosingController extends Controller
             return back();
         }
 
-        // get total omset perusahaan
-        $omset_13 = Helper::transactionPoin($date) * 1000 * 13 / 100;
-
-        // check qualified user
-        $users = User::whereIn('id', Helper::transactionUsers($date))->get()->filter(function ($a) use ($month) {
-            return $a->monthlyRoyaltyQualified($month) == true;
-        });
-        // count qualified
-        $total_13 = $users->count();
-        $bonus_13 = $total_13 ? floor($omset_13 / $total_13) : 0;
-        // do bonus
-        foreach ($users as $user) {
-            $user->bonuses()->create([
-                'type' => 'Bonus Royalti Profit Sharing 13%',
-                'amount' => round($bonus_13),
-                'description' => 'Bonus Royalti Profit Sharing 13%.',
-                'created_at' => $month.'-01 00:00:00',
-                'updated_at' => $month.'-01 00:00:00',
-            ]);
-        }
-
-        // do ro bonus
-        $potency = collect();
-        // transaction
-        $transactions = Transaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))
-            ->where('type', 'general')
-            ->where('poin', '>', 0)
-            ->whereNotNull('user_id')
-            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-            ->latest();
-        $userIdArray = clone $transactions;
-        $t_users = $userIdArray->groupBy('user_id')->pluck('user_id');
-        foreach ($t_users as $userId) {
-            $user = User::find($userId);
-            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
-            $upline = $user->upline;
-            $i = 1;
-            while ($i <= 10 && $upline) {
-                $percent = KeyValue::where('key', 'monthly_ro_unilevel_'.$i)->value('value');
-                $userTransactions = clone $transactions;
-                $userTransactions = $userTransactions->where('user_id', $userId)->get();
-                foreach ($userTransactions as $ut) {
-                    $carts = '';
-                    foreach ($ut->carts as $key => $cart) {
-                        if ($key + 1 == $ut->carts()->count()) {
-                            if ($key == 0) {
-                                $carts .= $cart->qty.' '. ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus').' ('.$cart->poin_total.' poin)';
-                            } else {
-                                $carts .= 'dan '.$cart->qty.' '. ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus').' ('.$cart->poin_total.' poin)';
-                            }
-                        } else {
-                            $carts .= $cart->qty.' '. ($cart->product ? $cart->product->name : $cart->name ?? 'Produk telah dihapus').' ('.$cart->poin_total.' poin)'.', ';
-                        }
-                    }
-                    $potency->push([
-                        'user_id' => $upline->id,
-                        'type' => 'Bonus Unilevel RO',
-                        'amount' => round($ut->poin * 1000 * $percent / 100),
-                        'description' => 'Bonus Unilevel RO dari belanja '.$user->username.'. Belanja '.$carts. '. Generasi ke-'.$i.' sebesar '.$percent.'% dari '.$ut->poin.' poin.',
-                        'created_at' => $ut->created_at,
-                    ]);
-                }
-                if (!$upline->member) {
-                    break;
-                }
-                if ($upline->member->member_phase_name != 'User Free' && $upline->monthlyQualified($month)) {
-                    $i++;
-                }
-                $upline = $upline->upline;
-            }
-        }
-        // official transaction
-        $ot = OfficialTransaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))->whereIn('status', ['paid', 'packed', 'shipped', 'received'])->latest();
-        $userIdArray = clone $ot;
-        $ot_users = $userIdArray->groupBy('user_id')->pluck('user_id');
-        foreach ($ot_users as $userId) {
-            $user = User::find($userId);
-            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
-            $upline = $user->upline;
-            $i = 1;
-            while ($i <= 10 && $upline) {
-                $percent = KeyValue::where('key', 'monthly_ro_unilevel_'.$i)->value('value');
-                $userTransactions = clone $ot;
-                $userTransactions = $userTransactions->where('user_id', $userId)->get();
-                foreach ($userTransactions as $ut) {
-                    $potency->push([
-                        'user_id' => $upline->id,
-                        'type' => 'Bonus Unilevel RO',
-                        'amount' => round($ut->poin * 1000 * $percent / 100),
-                        'description' => 'Bonus Unilevel RO dari belanja official '.$user->username.'. Belanja '.$ut->qty.' '.($ut->product->name ?? 'Produk telah dihapus').' ('.$ut->poin.' poin)'.'. Generasi ke-'.$i.' sebesar '.$percent.'% dari '.$ut->poin.' poin.',
-                        'created_at' => $ut->created_at,
-                    ]);
-                }
-                if (!$upline->member) {
-                    break;
-                }
-                if ($upline->member->member_phase_name != 'User Free' && $upline->monthlyQualified($month)) {
-                    $i++;
-                }
-                $upline = $upline->upline;
-            }
-        }
-        // pin
-        $users = User::whereHas('userPin', function ($q) {
+        // Bonus RO/Automaintain
+        // RO jika akumulasi 170 PV dalam masa aktif ATAU AUTOMAINTAIN Rp 1.700.000
+        // Hasil: Tambah 45 hari masa aktif, bonus naik ke upline seperti join Gold tanpa sponsor
+        
+        // 1. Cek user yang sudah mencapai 170 PV dalam bulan tersebut (dalam masa aktif)
+        // Hanya untuk pin: Gold, Gold Upgrade Platinum, dan Platinum
+        $allUsers = User::whereHas('userPin', function ($q) {
             $q->whereHas('pin', function ($q_pin) {
-                $q_pin->whereIn('name', ['Gold', 'Basic Upgrade Gold', 'Silver Upgrade Gold', 'Platinum', 'Basic Upgrade Platinum', 'Silver Upgrade Platinum', 'Gold Upgrade Platinum']);
+                $q_pin->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
             });
-        })->whereHas('dailyPoins', function ($q) {
-            $q->where('pv', '>', 0);
         })->get();
-        foreach ($users as $user) {
-            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
-            $upline = $user->upline;
-            $i = 1;
-            while ($i <= 10 && $upline) {
-                $percent = \App\Models\KeyValue::where('key', 'monthly_ro_unilevel_'.$i)->value('value');
-                $dp = $user->dailyPoins()->where('pv', '>', 0)->whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))->latest()->get();
-                foreach ($dp as $a) {
-                    $potency->push([
-                        'user_id' => $upline->id,
-                        'type' => 'Bonus Unilevel RO',
-                        'amount' => round($a->pv * 1000 * $percent / 100),
-                        'description' => 'Bonus Unilevel RO dari paket pin '.$a->user->username.' sejumlah '.$a->pv.' poin'.'. Generasi ke-'.$i.' sebesar '.$percent.'% dari '.$a->pv.' poin.',
-                        'created_at' => $a->created_at,
-                    ]);
-                }
-                if (!$upline->member) {
-                    break;
-                }
-                if ($upline->member->member_phase_name != 'User Free' && $upline->monthlyQualified($month)) {
-                    $i++;
-                }
-                $upline = $upline->upline;
+        
+        $roQualifiedUsers = collect();
+        foreach ($allUsers as $user) {
+            // Cek apakah user masih dalam masa aktif
+            if (!$user->active_until) {
+                continue;
+            }
+            
+            // Hitung total PV yang terkumpul dalam masa aktif untuk bulan tersebut
+            $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
+            $activeUntil = Carbon::parse($user->active_until);
+            
+            // Pastikan kita hanya menghitung PV dalam bulan yang sedang di-closing
+            $monthStart = $date->format('Y-m-01');
+            $monthEnd = $date->format('Y-m-t');
+            $checkFrom = max($activeFrom->format('Y-m-d'), $monthStart);
+            $checkUntil = min($activeUntil->format('Y-m-d'), $monthEnd);
+            
+            // Hitung PV dari transaksi dalam masa aktif bulan tersebut
+            $transactionPoin = Transaction::where('user_id', $user->id)
+                ->where('type', 'general')
+                ->where('poin', '>', 0)
+                ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+                ->whereBetween('created_at', [$checkFrom . ' 00:00:00', $checkUntil . ' 23:59:59'])
+                ->sum('poin');
+            
+            // Hitung PV dari official transaction dalam masa aktif bulan tersebut
+            $officialPoin = OfficialTransaction::where('user_id', $user->id)
+                ->where('poin', '>', 0)
+                ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+                ->whereBetween('created_at', [$checkFrom . ' 00:00:00', $checkUntil . ' 23:59:59'])
+                ->sum('poin');
+            
+            // Hitung PV dari daily poin dalam masa aktif bulan tersebut
+            $dailyPoinPV = $user->dailyPoins()
+                ->where('pv', '>', 0)
+                ->whereBetween('date', [$checkFrom, $checkUntil])
+                ->sum('pv');
+            
+            $totalPVInActive = $transactionPoin + $officialPoin + $dailyPoinPV;
+            
+            // Cek apakah sudah mencapai 170 PV dalam masa aktif
+            if ($totalPVInActive >= 170) {
+                $roQualifiedUsers->push($user);
             }
         }
-        // do
-        foreach ($potency as $a) {
-            Bonus::create($a);
-        }
-
-        // passup
-        $userPassUpCollections = collect();
-        $user_ids = array_unique(array_merge($t_users->toArray(), $ot_users->toArray()), SORT_REGULAR);
-        foreach ($user_ids as $user_id) {
-            $user = User::find($user_id);
-            if (!$user->monthlyQualified($month)) {
-                $poin = $user->monthlyPoin($month);
-                if ($poin) {
-                    // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
-                    $upline = $user->upline;
-                    $i = 1;
-                    while ($upline) {
-                        if ($upline->monthlyQualified($month)) {
-                            $userPassUp = $userPassUpCollections->firstWhere('user_id', $upline->id);
-                            if ($poin) {
-                                if ($userPassUp) {
-                                    $userPassUp['poin'] += $poin;
-                                } else {
-                                    $userPassUpCollections->push([
-                                        'user_id' => $upline->id,
-                                        'poin' => $poin,
-                                    ]);
-                                }
-                            }
-                            break;
-                        }
-                        $upline = $upline->upline;
-                    }
-                }
+        
+        // 2. Cek user yang melakukan AUTOMAINTAIN Rp 1.700.000 dalam bulan tersebut
+        // Cek base pin (Gold, Gold Upgrade Platinum, Platinum) dengan is_ro = true
+        $automaintainUsers = User::whereHas('userPins', function ($q) use ($date) {
+            $q->whereHas('pin', function ($q_pin) {
+                $q_pin->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
+            })
+            ->where('is_ro', true)
+            ->where('is_used', true)
+            ->whereYear('created_at', $date->format('Y'))
+            ->whereMonth('created_at', $date->format('m'));
+        })->get();
+        
+        // Gabungkan kedua kelompok user yang qualified
+        $allROUsers = $roQualifiedUsers->merge($automaintainUsers)->unique('id');
+        
+        // Validasi potensi bonus generasi RO yang sudah dibuat di Helper::upgrade()
+        // Bonus generasi sudah dibuat sebagai potensi saat RO dibuat, sekarang divalidasi apakah qualified
+        $allROUserIds = $allROUsers->pluck('id')->toArray();
+        
+        // Cari semua user yang punya pin RO (is_ro = true) dalam bulan tersebut
+        $allROPinUsers = User::whereHas('userPins', function ($q) use ($date) {
+            $q->whereHas('pin', function ($q_pin) {
+                $q_pin->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
+            })
+            ->where('is_ro', true)
+            ->where('is_used', true)
+            ->whereYear('created_at', $date->format('Y'))
+            ->whereMonth('created_at', $date->format('m'));
+        })->get();
+        
+        // Hapus bonus generasi untuk user yang tidak qualified (potensi tidak terpenuhi)
+        foreach ($allROPinUsers as $roUser) {
+            if (!in_array($roUser->id, $allROUserIds)) {
+                // User tidak qualified, hapus bonus generasi RO yang sudah dibuat sebagai potensi
+                Bonus::where('type', 'Bonus Generasi')
+                    ->where('description', 'like', '%RO ' . $roUser->username . '%')
+                    ->whereYear('created_at', $date->format('Y'))
+                    ->whereMonth('created_at', $date->format('m'))
+                    ->delete();
             }
         }
-
-        foreach ($userPassUpCollections as $a) {
-            Bonus::create([
-                'user_id' => $a['user_id'],
-                'type' => 'Bonus Unilevel RO',
-                'amount' => $a['poin'] * 130, // 130 = 1000 * 13%
-                'description' => 'Bonus Unilevel RO dari Pass Up dengan jumlah 13% dari ' . $a['poin'] . ' poin.',
-                'created_at' => $month.'-01 00:00:00',
-            ]);
+        
+        // Untuk user yang qualified, bonus generasi tetap ada (potensi terpenuhi)
+        // Tambah 45 hari masa aktif untuk user yang qualified
+        foreach ($allROUsers as $user) {
+            if ($user->active_until) {
+                Helper::extendActiveStatus($user, 'ro_qualified');
+            }
         }
 
         // create closing
@@ -332,9 +258,6 @@ class MonthlyClosingController extends Controller
                     $upline = $upline->upline;
                 }
             }
-            print(($key + 1). ' | ' . $user->username. ' | ' . $poin . ' | ' . ($poin >= 39 ? 'Bonus RO Qualified' : 'Bonus RO Not Qualified') . ' | ' . ($poin >= 250 ? 'Bonus Royalti Qualified' : 'Bonus Royalti Not Qualified') .  ' | ' . ($poin < 39 ? ($is_found ? ($sponsor->username . ' is Upper Qualified') : 'Upper Qualified Not Found') : '') . '<br>' );
-
         }
-        // dd($user_ids);
     }
 }

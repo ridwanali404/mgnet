@@ -481,8 +481,7 @@
                                             <th>Member</th>
                                             <th>Rekening</th>
                                             <th class="text-right">Komisi Penjualan (Rp)</th>
-                                            <th class="text-right">Bonus Unilevel RO (Rp)</th>
-                                            <th class="text-right">Bonus Royalti Profit Sharing 13% (Rp)</th>
+                                            <th class="text-right">GLOBAL Profit sharing (Rp)</th>
                                             <th class="text-right">Bonus Power Plus (Rp)</th>
                                             <th class="text-right">Total</th>
                                             <th class="text-right">Admin</th>
@@ -499,8 +498,7 @@
                                         @foreach ($users as $a)
                                             @php
                                                 $monthly_cashback_bonuses = $a->monthlyCashbackBonuses($month)->sum('amount');
-                                                $monthly_unilevel_RO_bonuses = $a->monthlyUnilevelROBonuses($month)->sum('amount');
-                                                $monthly_profit_sharing_13_bonuses = $a->monthlyProfitSharing13Bonuses($month)->sum('amount');
+                                                $monthly_profit_sharing_bonuses = $a->monthlyProfitSharingBonuses($month)->sum('amount');
                                                 $monthly_power_plus_bonuses = $a->monthlyPowerPlusBonuses($month)->sum('amount');
                                                 $monthly_bonus = $a->monthlyBonuses($month)->first();
                                                 $monthly_bonuses = $a->monthlyBonuses($month)->sum('amount');
@@ -548,10 +546,7 @@
                                                     <code>{{ number_format($monthly_cashback_bonuses, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-right">
-                                                    <code>{{ number_format($monthly_unilevel_RO_bonuses, 0, ',', '.') }}</code>
-                                                </td>
-                                                <td class="text-right">
-                                                    <code>{{ number_format($monthly_profit_sharing_13_bonuses, 0, ',', '.') }}</code>
+                                                    <code>{{ number_format($monthly_profit_sharing_bonuses, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-right">
                                                     <code>{{ number_format($monthly_power_plus_bonuses, 0, ',', '.') }}</code>
@@ -594,24 +589,6 @@
                                             </tr>
                                         @endforeach
                                     </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Member</th>
-                                            <th>Rekening</th>
-                                            <th class="text-right">Komisi Penjualan (Rp)</th>
-                                            <th class="text-right">Bonus Unilevel RO (Rp)</th>
-                                            <th class="text-right">Bonus Royalti Profit Sharing 13% (Rp)</th>
-                                            <th class="text-right">Bonus Power Plus (Rp)</th>
-                                            <th class="text-right">Total</th>
-                                            <th class="text-right">Admin</th>
-                                            <th class="text-right">Pajak</th>
-                                            <th class="text-right">Ditransfer</th>
-                                            <th>Status</th>
-                                            <th>Dibayar pada</th>
-                                            <th class="text-right">Konfirmasi</th>
-                                        </tr>
-                                    </tfoot>
                                 </table>
                             </div>
                         </div>

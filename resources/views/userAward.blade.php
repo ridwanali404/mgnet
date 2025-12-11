@@ -44,8 +44,11 @@
                 if (!$nextAward) {
                     $nextAward = \App\Models\Award::orderBy('nominal', 'desc')->first();
                 }
-                $percentage = round(($cash / $nextAward->nominal) * 100, 2);
-                $percentage = min($percentage, 100);
+                $percentage = 0;
+                if ($nextAward && $nextAward->nominal > 0) {
+                    $percentage = round(($cash / $nextAward->nominal) * 100, 2);
+                    $percentage = min($percentage, 100);
+                }
             @endphp
             <div class="card table-responsive">
                 <table class="table table-hover table-stripped m-0">

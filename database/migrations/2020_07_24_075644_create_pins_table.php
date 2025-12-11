@@ -35,6 +35,8 @@ class CreatePinsTable extends Migration
             $table->decimal('generasi_percent', 5, 2)->default(0);
             $table->decimal('powerplus_percent', 5, 2)->default(0);
             $table->boolean('is_generasi')->default(false);
+            $table->integer('active_days')->nullable()->comment('Hari aktif untuk paket ini (45 untuk Gold, 90 untuk Platinum)');
+            $table->bigInteger('ro_price')->nullable()->comment('Harga Repeat Order untuk paket ini (1.700.000 untuk Gold, 12.750.000 untuk Platinum)');
             $table->timestamps();
         });
     }

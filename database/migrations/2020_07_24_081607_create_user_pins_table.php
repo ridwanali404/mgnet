@@ -29,6 +29,7 @@ class CreateUserPinsTable extends Migration
             $table->bigInteger('price');
             $table->integer('level')->default(0);
             $table->boolean('is_used')->default(false);
+            $table->boolean('is_ro')->default(false)->comment('Menandai apakah ini adalah Repeat Order (RO)');
             $table->timestamps();
         });
     }

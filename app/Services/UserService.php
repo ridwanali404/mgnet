@@ -527,7 +527,12 @@ class UserService
     public function isAlreadyAutomaintain(User $user, $month)
     {
         $date = DateTime::createFromFormat('Y-m', $month);
-        return $user->userPins()->whereIn('name', ['PIN PAKET RO', 'BSM GOLD Automaintain'])
+        // Cek base pin (Gold, Gold Upgrade Platinum, Platinum) dengan is_ro = true
+        return $user->userPins()
+            ->whereHas('pin', function ($q) {
+                $q->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
+            })
+            ->where('is_ro', true)
             ->where('is_used', true)
             ->whereYear('created_at', $date->format('Y'))
             ->whereMonth('created_at', $date->format('m'))

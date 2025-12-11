@@ -130,8 +130,9 @@ trait Helper
             }
         } else {
             // Bonus Sponsor 15% - DIBUAT HARIAN (dibayar langsung saat upgrade)
-            // Skip bonus sponsor untuk pin upgrade (type = 'upgrade')
-            if ($pin->type != 'upgrade') {
+            // Skip bonus sponsor untuk pin upgrade (type = 'upgrade') dan RO (is_ro = true)
+            $isRO = $userPin->is_ro ?? false;
+            if (!$isRO && $pin->type != 'upgrade') {
                 $sponsor = $user->sponsor;
                 if ($sponsor && $sponsor->premiumUserPin()->count()) {
                     // Gunakan persentase jika ada, jika tidak gunakan nominal untuk backward compatibility
@@ -151,27 +152,45 @@ trait Helper
                     }
                 }
             }
-            if ($pin->name == 'PIN PAKET RO') {
-                $monoleg = $user->monoleg;
-                if ($monoleg) {
-                    $bonus = $monoleg->bonuses()->create([
-                        'type' => 'Komisi Monoleg',
-                        'amount' => $pin->bonus_monoleg,
-                        'description' => 'Komisi Monoleg dari penggunaan ' . $pin->name . ' oleh ' . $user->username . '.',
-                    ]);
-                    Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+            // Cek apakah ini pin RO (is_ro = true) untuk base pin Gold atau Platinum
+            // Bonus Monoleg untuk RO base pin (jika ada bonus_monoleg)
+            $isRO = $userPin->is_ro ?? false;
+            if ($isRO && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
+                $sponsor = $user->sponsor;
+                // Syarat: sponsor harus memiliki minimal 1 downline langsung
+                if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
+                    $monoleg = Helper::findMonolegRecursive($sponsor, $user);
+                    if ($monoleg) {
+                        $amount = round($pin->ro_price * $pin->monoleg_percent / 100);
+                        if ($amount > 0) {
+                            $bonus = $monoleg->bonuses()->create([
+                                'type' => 'Komisi Monoleg',
+                                'amount' => $amount,
+                                'description' => 'Komisi Monoleg dari RO ' . $pin->name . ' oleh ' . $user->username . '.',
+                            ]);
+                            Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                        }
+                    }
                 }
             }
         }
 
         // Bonus Generasi 19% - DIBUAT HARIAN (dibayar langsung saat upgrade)
+        // Untuk RO (is_ro = true), bonus generasi dibuat sebagai POTENSI seperti join Gold (tanpa sponsor)
+        // Potensi ini akan divalidasi saat monthly closing apakah user qualified (170 PV atau automaintain)
+        $isRO = $userPin->is_ro ?? false;
         $sponsor = $user->sponsor;
         
-        // Untuk upgrade Gold ke Platinum, hitung bonus generasi berdasarkan paket Platinum
-        $targetPin = $pin;
-        if ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) {
-            // Cari paket Platinum untuk menghitung bonus generasi
-            $targetPin = Pin::where('name', 'Platinum')->where('type', 'premium')->first();
+        // Untuk RO, gunakan paket Gold sebagai acuan (seperti join Gold tanpa sponsor)
+        if ($isRO) {
+            $targetPin = Pin::where('name', 'Gold')->where('type', 'premium')->first();
+        } else {
+            // Untuk upgrade Gold ke Platinum, hitung bonus generasi berdasarkan paket Platinum
+            $targetPin = $pin;
+            if ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) {
+                // Cari paket Platinum untuk menghitung bonus generasi
+                $targetPin = Pin::where('name', 'Platinum')->where('type', 'premium')->first();
+            }
         }
         
         if ($targetPin && $targetPin->is_generasi && $targetPin->price && $targetPin->generasi_percent > 0) {
@@ -209,8 +228,13 @@ trait Helper
                                 
                                 // Berikan bonus Gold ke Gold sponsor
                                 if ($goldAmount > 0) {
-                                    $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
-                                    $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                    if ($isRO) {
+                                        $action = 'RO';
+                                        $pinName = 'Gold (RO)';
+                                    } else {
+                                        $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                        $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                    }
                                     $goldBonus = $sponsor->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $goldAmount,
@@ -225,8 +249,13 @@ trait Helper
                                 
                                 // Berikan selisih ke Platinum upline
                                 if ($differenceAmount > 0) {
-                                    $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
-                                    $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                    if ($isRO) {
+                                        $action = 'RO';
+                                        $pinName = 'Gold (RO)';
+                                    } else {
+                                        $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                        $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                    }
                                     $bonus = $platinumUpline->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $differenceAmount,
@@ -262,11 +291,17 @@ trait Helper
                             $amount = round($totalAllocation * $percent / 100);
                             
                             if ($amount > 0 && $activeUpline->premiumUserPin && in_array($activeUpline->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
-                                $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                if ($isRO) {
+                                    $action = 'RO';
+                                    $pinName = 'Gold (RO)';
+                                } else {
+                                    $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                    $pinName = $pin->name;
+                                }
                                 $bonus = $activeUpline->bonuses()->create([
                                     'type' => 'Bonus Generasi',
                                     'amount' => $amount,
-                                    'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                    'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                                 ]);
                                 Helper::automaintain($activeUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                             }
@@ -282,8 +317,13 @@ trait Helper
                         $amount = round($totalAllocation * $percent / 100);
                         
                         if ($amount > 0) {
-                            $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
-                            $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                            if ($isRO) {
+                                $action = 'RO';
+                                $pinName = 'Gold (RO)';
+                            } else {
+                                $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
+                                $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                            }
                             $bonus = $sponsor->bonuses()->create([
                                 'type' => 'Bonus Generasi',
                                 'amount' => $amount,
@@ -298,8 +338,9 @@ trait Helper
             }
         }
 
-        // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM) - DIBUAT HARIAN (dibayar langsung saat upgrade)
-        if (!str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
+        // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM dan bukan RO) - DIBUAT HARIAN (dibayar langsung saat upgrade)
+        // $isRO sudah didefinisikan di atas
+        if (!$isRO && !str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
             $sponsor = $user->sponsor;
             // Syarat: sponsor harus memiliki minimal 1 downline langsung (berdasarkan upline_id)
             if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
@@ -322,8 +363,9 @@ trait Helper
         }
 
         // Profit Sharing 5% (Khusus Platinum - hanya untuk aktivasi perdana)
-        // Skip profit sharing untuk pin upgrade (type = 'upgrade')
-        if ($pin->type != 'upgrade' && $pin->name == 'Platinum' && $pin->profit_sharing_percent > 0) {
+        // Skip profit sharing untuk pin upgrade (type = 'upgrade') dan RO (is_ro = true)
+        $isRO = $userPin->is_ro ?? false;
+        if (!$isRO && $pin->type != 'upgrade' && $pin->name == 'Platinum' && $pin->profit_sharing_percent > 0) {
             // Cek apakah ini aktivasi perdana Platinum
             $isPerdana = !$user->profitSharings()->where('is_perdana_platinum', true)->exists();
             if ($isPerdana) {
@@ -337,7 +379,9 @@ trait Helper
 
         // Masa Aktif & Maintenance
         // Set masa aktif langsung saat join: Gold 45 hari, Platinum 90 hari
-        if (in_array($pin->name, ['Gold', 'Platinum'])) {
+        // Hanya untuk join/upgrade normal, bukan RO (RO sudah diperpanjang di Helper::ro())
+        $isRO = $userPin->is_ro ?? false;
+        if (!$isRO && in_array($pin->name, ['Gold', 'Platinum'])) {
             // Gunakan active_days dari pin jika ada, jika tidak gunakan default
             $activeDays = $pin->active_days ?? ($pin->name == 'Gold' ? 45 : 90);
             $user->update([
@@ -356,6 +400,146 @@ trait Helper
                 $pr = $pin->poin_reward;
                 $dailyPoin->increment('pr', $pr);
                 $sponsor = $sponsor->sponsor;
+            }
+        }
+    }
+
+    /**
+     * Berikan bonus generasi seperti join Gold TANPA bonus sponsor
+     * Digunakan untuk Bonus RO/Automaintain
+     */
+    public static function giveROBonusGenerasi($user, $month)
+    {
+        // Gunakan paket Gold sebagai acuan untuk bonus RO
+        $goldPin = Pin::where('name', 'Gold')->where('type', 'premium')->first();
+        if (!$goldPin || !$goldPin->is_generasi || !$goldPin->price || !$goldPin->generasi_percent) {
+            return;
+        }
+        
+        // Hitung total alokasi bonus generasi (19% dari harga paket Gold)
+        $totalAllocation = round($goldPin->price * $goldPin->generasi_percent / 100);
+        
+        // Distribusi persentase per generasi: 25%, kemudian turun sampai 3%
+        // Generasi 1: 25%, 2: 20%, 3: 15%, 4: 12%, 5: 10%, 6: 8%, 7: 6%, 8: 5%, 9: 4%, 10: 3%
+        $generasiPercentages = [25, 20, 15, 12, 10, 8, 6, 5, 4, 3];
+        
+        // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+        $sponsor = $user->upline;
+        
+        for ($i = 1; $i <= 10; $i++) {
+            if (!$sponsor) {
+                break;
+            }
+            
+            // Cek apakah sponsor punya pin generasi (Gold atau Platinum)
+            if ($sponsor->premiumUserPin && $sponsor->premiumUserPin->pin) {
+                $sponsorPin = $sponsor->premiumUserPin->pin;
+                
+                // Push-up mechanism: Jika di bawah Gold terdapat Platinum, selisih naik ke upline Platinum
+                if ($sponsorPin->name == 'Gold') {
+                    // Cari upline Platinum terdekat di atas Gold ini
+                    $platinumUpline = Helper::findPlatinumUpline($sponsor);
+                    if ($platinumUpline) {
+                        // Hitung bonus Gold yang seharusnya didapat oleh Gold sponsor
+                        $percent = $generasiPercentages[$i - 1] ?? 0;
+                        $goldAmount = round($totalAllocation * $percent / 100);
+                        
+                        // Berikan bonus Gold ke Gold sponsor
+                        if ($goldAmount > 0) {
+                            $goldBonus = $sponsor->bonuses()->create([
+                                'type' => 'Bonus Generasi',
+                                'amount' => $goldAmount,
+                                'description' => 'Bonus Generasi dari RO ' . $user->username . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                'created_at' => $month . '-01 00:00:00',
+                                'updated_at' => $month . '-01 00:00:00',
+                            ]);
+                            Helper::automaintain($sponsor, 'K', $goldBonus->amount, 'Saldo automaintain dari ' . $goldBonus->description);
+                        }
+                        
+                        // Hitung bonus Platinum dan selisihnya
+                        $platinumPin = Pin::where('name', 'Platinum')->where('type', 'premium')->first();
+                        if ($platinumPin && $platinumPin->is_generasi && $platinumPin->price && $platinumPin->generasi_percent > 0) {
+                            $platinumAllocation = round($platinumPin->price * $platinumPin->generasi_percent / 100);
+                            $platinumAmount = round($platinumAllocation * $percent / 100);
+                            $differenceAmount = $platinumAmount - $goldAmount;
+                            
+                            // Berikan selisih ke Platinum upline
+                            if ($differenceAmount > 0) {
+                                $bonus = $platinumUpline->bonuses()->create([
+                                    'type' => 'Bonus Generasi',
+                                    'amount' => $differenceAmount,
+                                    'description' => 'Bonus Generasi dari RO ' . $user->username . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($platinumAllocation, 0, ',', '.') . ').',
+                                    'created_at' => $month . '-01 00:00:00',
+                                    'updated_at' => $month . '-01 00:00:00',
+                                ]);
+                                Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                            }
+                        }
+                        // Skip Gold ini, lanjut ke sponsor berikutnya
+                        $sponsor = $sponsor->upline;
+                        continue;
+                    }
+                }
+                
+                // Push-up mechanism: Jika akun tidak aktif 90 hari, push-up ke upline aktif
+                $isInactive90Days = false;
+                if (!$sponsor->is_active) {
+                    $isInactive90Days = true;
+                } elseif ($sponsor->active_until) {
+                    // Cek apakah sudah melewati 90 hari dari active_until
+                    $inactiveDate = Carbon::parse($sponsor->active_until);
+                    if ($inactiveDate->addDays(90)->lt(Carbon::now())) {
+                        $isInactive90Days = true;
+                    }
+                }
+                
+                if ($isInactive90Days) {
+                    // Cari upline aktif terdekat
+                    $activeUpline = Helper::findActiveUpline($sponsor);
+                    if ($activeUpline && $activeUpline->id != $sponsor->id) {
+                        // Push-up ke upline aktif
+                        $percent = $generasiPercentages[$i - 1] ?? 0;
+                        $amount = round($totalAllocation * $percent / 100);
+                        
+                        if ($amount > 0 && $activeUpline->premiumUserPin && in_array($activeUpline->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
+                            $bonus = $activeUpline->bonuses()->create([
+                                'type' => 'Bonus Generasi',
+                                'amount' => $amount,
+                                'description' => 'Bonus Generasi dari RO ' . $user->username . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                'created_at' => $month . '-01 00:00:00',
+                                'updated_at' => $month . '-01 00:00:00',
+                            ]);
+                            Helper::automaintain($activeUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                        }
+                        // Skip sponsor tidak aktif, lanjut ke sponsor berikutnya
+                        $sponsor = $sponsor->upline;
+                        continue;
+                    }
+                }
+                
+                // Normal flow: berikan bonus jika sponsor punya Gold atau Platinum
+                if (in_array($sponsorPin->name, ['Gold', 'Platinum'])) {
+                    $percent = $generasiPercentages[$i - 1] ?? 0;
+                    $amount = round($totalAllocation * $percent / 100);
+                    
+                    if ($amount > 0) {
+                        $bonus = $sponsor->bonuses()->create([
+                            'type' => 'Bonus Generasi',
+                            'amount' => $amount,
+                            'description' => 'Bonus Generasi dari RO ' . $user->username . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                            'created_at' => $month . '-01 00:00:00',
+                            'updated_at' => $month . '-01 00:00:00',
+                        ]);
+                        Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                    }
+                }
+            }
+            
+            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
+            if ($sponsor) {
+                $sponsor = $sponsor->upline;
+            } else {
+                break;
             }
         }
     }
@@ -772,35 +956,38 @@ trait Helper
 
     public static function ro($user)
     {
-        if ($user->userPin->pin->level < 3) {
-            $pin = Pin::where('name', 'BSM GOLD Automaintain')->first();
-            if (!$pin) {
-                return new UserPin();
-            }
-            $description = 'Penggunaan Pin ' . $pin->name . '.';
-        } else {
-            $pin = Pin::where('name', 'PIN PAKET RO')->first();
-            if (!$pin) {
-                return new UserPin();
-            }
-            $description = 'Penggunaan ' . $pin->name . '.';
+        // Gunakan base pin user (Gold, Gold Upgrade Platinum, atau Platinum) untuk RO
+        $currentUserPin = $user->premiumUserPin;
+        if (!$currentUserPin || !$currentUserPin->pin) {
+            return;
         }
+        
+        $basePin = $currentUserPin->pin;
+        
+        // Hanya untuk base pin: Gold, Gold Upgrade Platinum, atau Platinum
+        if (!in_array($basePin->name, ['Gold', 'Gold Upgrade Platinum', 'Platinum'])) {
+            return;
+        }
+        
         // Automaintain limit adalah 1,7 juta (bukan 2 juta)
         $user->decrement('cash_automaintain', 1700000);
         $user->automaintains()->create([
             'type' => 'D',
             'amount' => 1700000,
             'current' => $user->cash_automaintain,
-            'description' => $description,
+            'description' => 'Penggunaan Repeat Order ' . $basePin->name . '.',
         ]);
+        
+        // Buat UserPin dengan base pin yang sama, tapi ditandai sebagai RO
         $userPin = $user->userPins()->create([
             'buyer_id' => $user->id,
-            'pin_id' => $pin->id,
+            'pin_id' => $basePin->id,
             'code' => strtoupper(str_random(6)),
-            'name' => $pin->name,
-            'price' => $pin->price,
-            'level' => $pin->level,
+            'name' => $basePin->name,
+            'price' => $basePin->ro_price ?? ($basePin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
+            'level' => $basePin->level,
             'is_used' => true,
+            'is_ro' => true, // Tandai sebagai Repeat Order
         ]);
         Helper::pinHistory($userPin);
         Helper::upgrade($userPin);
@@ -844,10 +1031,18 @@ trait Helper
         $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000; // Convert poin ke rupiah (1 poin = 1000)
         $profitSharingAmount = round($totalOmzet * 0.05); // 5% dari omzet
         
-        // Dapatkan semua user Platinum yang aktivasi perdana dan sudah Qualified
+        // Dapatkan semua user Platinum yang aktivasi perdana (JOIN dari awal, bukan upgrade) dan sudah Qualified
         $platinumUsers = User::whereHas('profitSharings', function ($q) {
             $q->where('is_perdana_platinum', true);
-        })->where('is_active', true)->get();
+        })
+        ->whereHas('premiumUserPin', function ($q) {
+            $q->whereHas('pin', function ($qPin) {
+                // Hanya Platinum yang JOIN dari awal (type = 'premium', bukan 'upgrade')
+                $qPin->where('name', 'Platinum')->where('type', 'premium');
+            });
+        })
+        ->where('is_active', true)
+        ->get();
         
         foreach ($platinumUsers as $user) {
             // Cek apakah user sudah Qualified (minimal 3 tim aktif)
@@ -1096,7 +1291,7 @@ trait Helper
         $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000;
         $umrohAmount = round($totalOmzet * 0.04);
         
-        // Dapatkan semua user yang memiliki minimal 3 tim aktif
+        // Dapatkan semua user yang memiliki minimal 3 sponsor langsung (premium dan aktif)
         $qualifiedUsers = User::whereHas('premiumUserPin', function ($q) {
             $q->whereHas('pin', function ($qPin) {
                 $qPin->whereIn('name', ['Gold', 'Platinum']);
@@ -1105,12 +1300,16 @@ trait Helper
         ->where('is_active', true)
         ->get()
         ->filter(function ($user) {
-            // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
-            $activeTeams = $user->uplines()
-                ->whereHas('premiumUserPin')
+            // Hitung sponsor langsung (disponsori langsung) yang premium dan aktif
+            $sponsorCount = $user->sponsors()
+                ->whereHas('premiumUserPin', function ($q) {
+                    $q->whereHas('pin', function ($qPin) {
+                        $qPin->whereIn('name', ['Gold', 'Platinum']);
+                    });
+                })
                 ->where('is_active', true)
                 ->count();
-            return $activeTeams >= 3;
+            return $sponsorCount >= 3;
         });
         
         foreach ($qualifiedUsers as $user) {
@@ -1122,8 +1321,12 @@ trait Helper
                 [
                     'yearly_accumulation' => 0,
                     'claimed_amount' => 0,
-                    'active_teams_count' => $user->uplines()
-                        ->whereHas('premiumUserPin')
+                    'active_teams_count' => $user->sponsors()
+                        ->whereHas('premiumUserPin', function ($q) {
+                            $q->whereHas('pin', function ($qPin) {
+                                $qPin->whereIn('name', ['Gold', 'Platinum']);
+                            });
+                        })
                         ->where('is_active', true)
                         ->count(),
                 ]
@@ -1178,11 +1381,12 @@ trait Helper
         // Hitung total belanja RO dalam masa aktif (dari tanggal mulai aktif sampai sekarang)
         $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
         
-        // Total belanja dari automaintain RO (PIN PAKET RO atau BSM GOLD Automaintain)
+        // Total belanja dari automaintain RO (base pin dengan is_ro = true)
         $automaintainRO = $user->userPins()
             ->whereHas('pin', function($q) {
-                $q->whereIn('name', ['PIN PAKET RO', 'BSM GOLD Automaintain']);
+                $q->whereIn('name', ['Gold', 'Gold Upgrade Platinum', 'Platinum']);
             })
+            ->where('is_ro', true)
             ->whereBetween('created_at', [$activeFrom, Carbon::now()])
             ->sum('price');
 

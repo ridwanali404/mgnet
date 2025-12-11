@@ -52,9 +52,17 @@ class CreateUsersTable extends Migration
             $table->bigInteger('sponsor_id')->unsigned()->nullable();
             $table->foreign('sponsor_id')->references('id')->on('users')
                 ->onUpdate('cascade')->onDelete('set null');
+            $table->bigInteger('upline_id')->unsigned()->nullable()->after('sponsor_id');
+            $table->foreign('upline_id')->references('id')->on('users')
+                ->onUpdate('cascade')->onDelete('set null');
             $table->bigInteger('monoleg_id')->unsigned()->nullable();
             $table->foreign('monoleg_id')->references('id')->on('users')
                 ->onUpdate('cascade')->onDelete('set null');
+            $table->date('active_until')->nullable()->after('monoleg_id');
+            $table->integer('active_days_initial')->nullable()->after('active_until')->comment('45 untuk Gold, 90 untuk Platinum');
+            $table->boolean('is_active')->default(true)->after('active_days_initial');
+            $table->integer('sponsor_count')->default(0)->after('is_active')->comment('Untuk tracking jumlah sponsor');
+            $table->string('placement_side')->nullable()->after('sponsor_count')->comment('left atau right untuk penempatan');
         });
     }
 

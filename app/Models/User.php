@@ -553,11 +553,12 @@ class User extends Authenticatable
             $q->whereHas('pin', function ($q_pin) {
                 $q_pin->where('poin_pair', '>', 0);
             });
+            // Exclude pin RO (is_ro = true) kecuali yang sudah is_used
             $q->where(function ($q1) {
-                $q1->where('name', '!=', 'PIN PAKET RO');
-                $q1->orWhere(function ($q2) {
-                    $q2->where('name', 'PIN PAKET RO')->where('is_used', true);
-                });
+                $q1->where('is_ro', false)
+                    ->orWhere(function ($q2) {
+                        $q2->where('is_ro', true)->where('is_used', true);
+                    });
             });
             $q->whereDate('updated_at', $date);
         });
