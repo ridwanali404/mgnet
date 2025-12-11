@@ -128,28 +128,24 @@
                                     @php
                                         $now = \Carbon\Carbon::now();
                                         $activeDate = \Carbon\Carbon::parse($activeUntil);
-                                        $daysLeft = $now->diffInDays($activeDate, false);
+                                        $daysLeft = ceil($now->diffInDays($activeDate, false));
                                     @endphp
                                     <h2 class="font-light text-white text-truncate">
                                         @if ($isActive && $daysLeft > 0)
-                                            <span class="label label-success">Aktif</span>
-                                            <br>
-                                            <small class="text-white-50">Sampai: {{ $activeDate->format('d M Y') }}</small>
-                                            <br>
-                                            <small class="text-white-50">{{ $daysLeft }} hari tersisa</small>
+                                            <span class="label label-success py-2">Aktif</span>
+                                            <small class="text-white-50">Sampai <b>{{ $activeDate->format('d M Y') }}</b></small>
+                                            <small class="text-white-50">({{ $daysLeft }} hari tersisa)</small>
                                         @elseif ($isActive && $daysLeft <= 0)
-                                            <span class="label label-warning">Hari Terakhir</span>
-                                            <br>
-                                            <small class="text-white-50">Berakhir: {{ $activeDate->format('d M Y') }}</small>
+                                            <span class="label label-warning py-2">Hari Terakhir</span>
+                                            <small class="text-white-50">Berakhir pada <b>{{ $activeDate->format('d M Y') }}</b></small>
                                         @else
-                                            <span class="label label-danger">Tidak Aktif</span>
-                                            <br>
-                                            <small class="text-white-50">Berakhir: {{ $activeDate->format('d M Y') }}</small>
+                                            <span class="label label-danger py-2">Tidak Aktif</span>
+                                            <small class="text-white-50">Berakhir pada <b>{{ $activeDate->format('d M Y') }}</b></small>
                                         @endif
                                     </h2>
                                 @else
                                     <h2 class="font-light text-white text-truncate">
-                                        <span class="label label-default">Belum Terdaftar</span>
+                                        <span class="label label-default text-dark py-2">Belum Terdaftar</span>
                                     </h2>
                                 @endif
                             </div>
