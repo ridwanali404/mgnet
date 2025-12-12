@@ -12,6 +12,7 @@ use App\Models\OfficialTransaction;
 use App\Models\GlobalDailyPoin;
 use App\Models\KeyValue;
 use App\Models\Poin;
+use App\Models\UserPin;
 use Carbon\Carbon;
 use DateTime;
 use Illuminate\Support\Facades\DB;
@@ -160,7 +161,10 @@ class ProfitSharingDailySeeder extends Seeder
         if (KeyValue::where('key', 'poin')->value('value') == 'enable') {
             $poinRecord = Poin::whereDate('date', $date->format('Y-m-d'))->first();
             if ($poinRecord) {
-                return $poinRecord->poin * 1000; // Convert poin ke rupiah
+                // Tambahkan penggunaan PIN ke omset
+                $pinOmzet = UserPin::whereDate('created_at', $date->format('Y-m-d'))
+                    ->sum('price');
+                return ($poinRecord->poin * 1000) + $pinOmzet; // Convert poin ke rupiah + PIN omset
             }
         }
         
@@ -180,7 +184,11 @@ class ProfitSharingDailySeeder extends Seeder
         
         $poin = $transactionPoin + $officialTransactionPoin + $globalDailyPoin;
         
-        // Convert poin ke rupiah (1 poin = 1000 rupiah)
-        return $poin * 1000;
+        // Hitung dari penggunaan PIN (pembelian PIN harian)
+        $pinOmzet = UserPin::whereDate('created_at', $date->format('Y-m-d'))
+            ->sum('price');
+        
+        // Convert poin ke rupiah (1 poin = 1000 rupiah) + PIN omset
+        return ($poin * 1000) + $pinOmzet;
     }
 }

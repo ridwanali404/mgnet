@@ -17,7 +17,7 @@ class GenerateTripBonus extends Command
      *
      * @var string
      */
-    protected $signature = 'trip:generate {date?} {--no-interaction}';
+    protected $signature = 'trip:generate {date?}';
 
     /**
      * The console command description.
@@ -55,8 +55,18 @@ class GenerateTripBonus extends Command
         $this->info("Target Tanggal: {$targetDateReadable} ({$targetDateFormatted})");
         $this->newLine();
         
+        // Cari tanggal pertama UserPin dibuat (untuk menentukan tanggal mulai generate)
+        $firstUserPinDate = \App\Models\UserPin::min('created_at');
+        $startDate = null;
+        
+        if ($firstUserPinDate) {
+            $startDate = Carbon::parse($firstUserPinDate)->startOfDay();
+        }
+        
         // Cek tanggal terakhir yang sudah di-generate
         $lastGeneratedDate = UmrohTripDaily::max('date');
+        
+        $datesToGenerate = [];
         
         if ($lastGeneratedDate) {
             $lastDate = Carbon::parse($lastGeneratedDate);
@@ -65,17 +75,8 @@ class GenerateTripBonus extends Command
             
             // Tentukan range tanggal yang perlu di-generate
             if ($lastDate->lt($targetDate)) {
-                // Tanggal terakhir < target date: generate dari (last + 1) sampai target
-                // Plus regenerate tanggal terakhir
-                $startDate = $lastDate->copy();
-                $endDate = $targetDate->copy();
-                $datesToGenerate = [];
-                
-                // Regenerate tanggal terakhir
-                $datesToGenerate[] = $lastDate->format('Y-m-d');
-                
-                // Generate dari (last + 1) sampai target
-                $currentDate = $lastDate->copy()->addDay();
+                // Tanggal terakhir < target date: generate dari tanggal terakhir (regenerate) sampai target
+                $currentDate = $lastDate->copy();
                 while ($currentDate->lte($targetDate)) {
                     $datesToGenerate[] = $currentDate->format('Y-m-d');
                     $currentDate->addDay();
@@ -83,30 +84,43 @@ class GenerateTripBonus extends Command
                 
                 $this->info("Akan generate: " . count($datesToGenerate) . " hari");
                 $this->info("  - Regenerate: {$lastDateReadable} (untuk memastikan data terbaru)");
-                $this->info("  - Generate baru: " . ($lastDate->copy()->addDay()->translatedFormat('d F Y')) . " sampai {$targetDateReadable}");
+                if (count($datesToGenerate) > 1) {
+                    $nextDate = $lastDate->copy()->addDay();
+                    $this->info("  - Generate baru: " . $nextDate->translatedFormat('d F Y') . " sampai {$targetDateReadable}");
+                }
             } elseif ($lastDate->eq($targetDate)) {
                 // Tanggal terakhir == target date: hanya regenerate
                 $datesToGenerate = [$lastDate->format('Y-m-d')];
                 $this->info("Akan regenerate: {$lastDateReadable} (untuk memastikan data terbaru)");
             } else {
-                // Tanggal terakhir > target date: warning
+                // Tanggal terakhir > target date: hanya regenerate tanggal target
+                $datesToGenerate = [$targetDate->format('Y-m-d')];
+                
                 $this->warn("⚠️  Tanggal terakhir di-generate ({$lastDateReadable}) lebih baru dari target tanggal ({$targetDateReadable})!");
-                // Skip confirm jika dijalankan non-interactive (dari web)
-                if ($this->option('no-interaction') || php_sapi_name() !== 'cli') {
-                    $this->info("Non-interactive mode: akan regenerate tanggal terakhir");
-                    $datesToGenerate = [$lastDate->format('Y-m-d')];
-                } elseif (!$this->confirm('Apakah Anda ingin tetap regenerate tanggal terakhir?', false)) {
-                    $this->info("Generate dibatalkan.");
-                    return 0;
-                } else {
-                    $datesToGenerate = [$lastDate->format('Y-m-d')];
-                }
+                $this->info("Akan regenerate: {$targetDateReadable} (untuk memastikan data terbaru)");
             }
         } else {
-            // Belum ada data sama sekali: generate dari target date saja
-            $datesToGenerate = [$targetDateFormatted];
-            $this->info("Belum ada data sebelumnya. Akan generate untuk: {$targetDateReadable}");
+            // Belum ada data sama sekali: generate dari tanggal pertama UserPin sampai target
+            if ($startDate && $startDate->lte($targetDate)) {
+                $currentDate = $startDate->copy();
+                while ($currentDate->lte($targetDate)) {
+                    $datesToGenerate[] = $currentDate->format('Y-m-d');
+                    $currentDate->addDay();
+                }
+                
+                $startDateReadable = $startDate->translatedFormat('d F Y');
+                $this->info("Belum ada data sebelumnya.");
+                $this->info("Tanggal pertama UserPin dibuat: {$startDateReadable}");
+                $this->info("Akan generate: " . count($datesToGenerate) . " hari dari {$startDateReadable} sampai {$targetDateReadable}");
+            } else {
+                // Jika tidak ada UserPin atau startDate > targetDate, generate target date saja
+                $datesToGenerate = [$targetDateFormatted];
+                $this->info("Belum ada data sebelumnya. Akan generate untuk: {$targetDateReadable}");
+            }
         }
+        
+        // Pastikan datesToGenerate sudah diurutkan ascending (dari tanggal paling awal ke terbaru)
+        sort($datesToGenerate);
         
         $this->newLine();
         
@@ -126,7 +140,8 @@ class GenerateTripBonus extends Command
             $this->info("Processing: {$processDateReadable} ({$dateToProcess})");
             
             // Untuk regenerate: hapus data existing dan kurangi dari akumulasi
-            $isRegenerate = ($lastGeneratedDate && $dateToProcess === $lastGeneratedDate);
+            // Regenerate jika tanggal ini sudah pernah di-generate sebelumnya
+            $isRegenerate = UmrohTripDaily::whereDate('date', $dateToProcess)->exists();
             if ($isRegenerate) {
                 $this->line("  → Regenerate (hapus data lama dan generate ulang)");
                 
@@ -263,3 +278,6 @@ class GenerateTripBonus extends Command
         return 0;
     }
 }
+
+
+

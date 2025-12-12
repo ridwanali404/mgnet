@@ -659,21 +659,34 @@ trait Helper
 
     public static function transactionPoin(DateTime $date)
     {
+        $year = $date->format('Y');
+        $month = $date->format('m');
+        
+        // Hitung dari penggunaan PIN (pembelian PIN bulanan)
+        // Termasuk: Semua PIN terjual, Upgrade, dan Automaintain/autoRO
+        // Automaintain sudah membuat UserPin, jadi semua UserPin yang dibuat harus dihitung
+        // Convert price (rupiah) ke poin (1 poin = 1000 rupiah)
+        $pinOmzet = UserPin::whereYear('created_at', $year)
+            ->whereMonth('created_at', $month)
+            ->sum('price');
+        $pinPoin = $pinOmzet / 1000;
+        
         if (KeyValue::where('key', 'poin')->value('value') == 'enable') {
-            $poin = Poin::whereYear('date', $date->format('Y'))->whereMonth('date', $date->format('m'))->first();
+            $poin = Poin::whereYear('date', $year)->whereMonth('date', $month)->first();
             if ($poin) {
-                return $poin->poin;
+                // Tambahkan PIN purchases ke poin
+                return $poin->poin + $pinPoin;
             }
         }
-        $t = Transaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))
+        $t = Transaction::whereYear('created_at', $year)->whereMonth('created_at', $month)
             ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
             ->sum('poin');
-        $ot = OfficialTransaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))
+        $ot = OfficialTransaction::whereYear('created_at', $year)->whereMonth('created_at', $month)
             ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
             ->sum('poin');
-        $gdp = GlobalDailyPoin::whereYear('date', $date->format('Y'))->whereMonth('date', $date->format('m'))
+        $gdp = GlobalDailyPoin::whereYear('date', $year)->whereMonth('date', $month)
             ->sum('pv');
-        return $t + $ot + $gdp;
+        return $t + $ot + $gdp + $pinPoin;
     }
 
     /**
@@ -695,11 +708,20 @@ trait Helper
         
         $dateStr = $dateObj->format('Y-m-d');
         
+        // Hitung dari penggunaan PIN (pembelian PIN harian)
+        // Termasuk: Semua PIN terjual, Upgrade, dan Automaintain/autoRO
+        // Automaintain sudah membuat UserPin, jadi semua UserPin yang dibuat harus dihitung
+        // Convert price (rupiah) ke poin (1 poin = 1000 rupiah)
+        $pinOmzet = UserPin::whereDate('created_at', $dateStr)
+            ->sum('price');
+        $pinPoin = $pinOmzet / 1000;
+        
         // Cek apakah menggunakan Poin model
         if (KeyValue::where('key', 'poin')->value('value') == 'enable') {
             $poin = Poin::whereDate('date', $dateStr)->first();
             if ($poin) {
-                return $poin->poin;
+                // Tambahkan PIN purchases ke poin
+                return $poin->poin + $pinPoin;
             }
         }
         
@@ -717,7 +739,7 @@ trait Helper
         $gdp = GlobalDailyPoin::whereDate('date', $dateStr)
             ->sum('pv');
         
-        return $t + $ot + $gdp;
+        return $t + $ot + $gdp + $pinPoin;
     }
 
     public static function isClosing($month)
@@ -1072,8 +1094,8 @@ trait Helper
             $date = date('Y-m-d');
         }
         
-        // Hitung total omzet perusahaan hari ini
-        $totalOmzet = Helper::transactionPoin(DateTime::createFromFormat('Y-m-d', $date)) * 1000; // Convert poin ke rupiah (1 poin = 1000)
+        // Hitung total omzet perusahaan hari ini menggunakan transactionPoinDaily
+        $totalOmzet = Helper::transactionPoinDaily($date) * 1000; // Convert poin ke rupiah (1 poin = 1000)
         $profitSharingAmount = round($totalOmzet * 0.05); // 5% dari omzet
         
         // Dapatkan semua user Platinum yang aktivasi perdana (JOIN dari awal, bukan upgrade) dan sudah Qualified

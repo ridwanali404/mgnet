@@ -182,9 +182,9 @@ class UserTripController extends Controller
             }
 
             // Run the command dengan non-interactive mode
+            // Laravel otomatis menambahkan --no-interaction untuk web context
             Artisan::call('trip:generate', [
                 'date' => $date,
-                '--no-interaction' => true,
             ]);
 
             // Get command output
