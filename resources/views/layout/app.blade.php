@@ -325,6 +325,10 @@
                                 <a href="{{ route('award.index') }}" aria-expanded="false"><i
                                         class="mdi mdi-trophy"></i><span class="hide-menu">Reward</span></a>
                             </li>
+                            <li class="{{ Route::is('trip-reward.index') ? 'active' : '' }}">
+                                <a href="{{ route('trip-reward.index') }}" aria-expanded="false"><i
+                                        class="mdi mdi-airplane-takeoff"></i><span class="hide-menu">Trip Reward</span></a>
+                            </li>
                             <li class="{{ Route::is('rank.index') ? 'active' : '' }}">
                                 <a href="{{ route('rank.index') }}" aria-expanded="false"><i
                                         class="mdi mdi-star"></i><span class="hide-menu">Peringkat</span></a>

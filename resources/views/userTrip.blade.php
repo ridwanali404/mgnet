@@ -141,8 +141,6 @@
                 $totalAccumulation = $currentYearSaving ? $currentYearSaving->yearly_accumulation : 0;
                 $claimedAmount = $currentYearSaving ? $currentYearSaving->claimed_amount : 0;
                 $availableBalance = $totalAccumulation - $claimedAmount;
-                $minClaimAmount = 5000000; // Minimum 5 juta untuk klaim
-                $canClaim = $availableBalance >= $minClaimAmount;
             @endphp
             
             @if (isset($isQualified) && !$isQualified)
@@ -184,9 +182,17 @@
                         <div class="col-md-4">
                             <div class="card bg-info text-white">
                                 <div class="card-body">
-                                    <h4 class="text-white">Total Akumulasi</h4>
-                                    <h2 class="text-white">Rp {{ number_format($totalAccumulation, 0, ',', '.') }}</h2>
-                                    <p class="text-white-50 mb-0">Maksimal Rp 50.000.000/tahun</p>
+                                    <h4 class="text-white">
+                                        Total Akumulasi
+                                        <span 
+                                            data-toggle="tooltip" 
+                                            data-placement="top" 
+                                            title="Maksimal Rp 50.000.000/tahun" 
+                                            style="cursor: pointer;">
+                                            <i class="mdi mdi-help-circle-outline" style="vertical-align: middle; font-size: 0.8em;"></i>
+                                        </span>
+                                    </h4>
+                                    <h2 class="text-white mb-0">Rp {{ number_format($totalAccumulation, 0, ',', '.') }}</h2>
                                 </div>
                             </div>
                         </div>
@@ -194,26 +200,93 @@
                             <div class="card bg-warning text-white">
                                 <div class="card-body">
                                     <h4 class="text-white">Sudah Diklaim</h4>
-                                    <h2 class="text-white">Rp {{ number_format($claimedAmount, 0, ',', '.') }}</h2>
+                                    <h2 class="text-white mb-0">Rp {{ number_format($claimedAmount, 0, ',', '.') }}</h2>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="card {{ $canClaim ? 'bg-success' : 'bg-secondary' }} text-white">
+                            <div class="card bg-success text-white">
                                 <div class="card-body">
                                     <h4 class="text-white">Saldo Tersedia</h4>
-                                    <h2 class="text-white">Rp {{ number_format($availableBalance, 0, ',', '.') }}</h2>
-                                    @if ($canClaim)
-                                        <p class="text-white-50 mb-0">✓ Siap untuk diklaim</p>
-                                    @else
-                                        <p class="text-white-50 mb-0">Minimal Rp {{ number_format($minClaimAmount, 0, ',', '.') }} untuk klaim</p>
-                                    @endif
+                                    <h2 class="text-white mb-0">Rp {{ number_format($availableBalance, 0, ',', '.') }}</h2>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            
+            @if (isset($claimableRewards) && $claimableRewards->count() > 0)
+                <!-- Reward yang Bisa Diklaim -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h3 class="card-title">Reward yang Tersedia</h3>
+                        <h6 class="card-subtitle">Reward yang dapat diklaim berdasarkan saldo tersedia</h6>
+                        <div class="row mt-3">
+                            @foreach ($claimableRewards as $reward)
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ $reward->name }}</h5>
+                                            <p class="card-text">
+                                                <strong>Rp {{ number_format($reward->nominal, 0, ',', '.') }}</strong>
+                                                @if ($reward->description)
+                                                    <br><small class="text-muted">{{ $reward->description }}</small>
+                                                @endif
+                                            </p>
+                                            <form action="{{ route('userTrip.claim', $reward->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin mengklaim reward {{ $reward->name }} (Rp {{ number_format($reward->nominal, 0, ',', '.') }})?');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-success btn-block">
+                                                    <i class="mdi mdi-check"></i> Klaim Reward
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endif
+            
+            @if (isset($claimedRewards) && $claimedRewards->count() > 0)
+                <!-- Histori Reward yang Sudah Diklaim -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h3 class="card-title">Histori Reward yang Sudah Diklaim</h3>
+                        <div class="table-responsive mt-3">
+                            <table class="table table-hover table-striped table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Tanggal Klaim</th>
+                                        <th>Nama Reward</th>
+                                        <th class="text-right">Nominal</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($claimedRewards as $claimed)
+                                        <tr>
+                                            <td>{{ $loop->index + 1 }}</td>
+                                            <td>{{ \Carbon\Carbon::parse($claimed->created_at)->translatedFormat('d F Y H:i') }}</td>
+                                            <td><strong>{{ $claimed->tripReward->name }}</strong></td>
+                                            <td class="text-right">Rp {{ number_format($claimed->amount, 0, ',', '.') }}</td>
+                                            <td>
+                                                @if ($claimed->is_paid)
+                                                    <span class="badge badge-success">Sudah Dibayar</span>
+                                                @else
+                                                    <span class="badge badge-warning">Menunggu Konfirmasi</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
         <div class="card">
             <div class="card-body">

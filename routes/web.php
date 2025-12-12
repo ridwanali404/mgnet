@@ -86,7 +86,14 @@ Route::group(['middleware' => 'auth'], function () {
         Route::resource('a/about-us', 'AboutUsController');
         Route::resource('a/contact-us', 'ContactUsController');
         Route::resource('a/page', 'PageController');
-        Route::resource('a/user', 'UserController');
+        Route::resource('a/user', 'UserController', ['names' => [
+            'create' => 'a.user.create',
+            'store' => 'a.user.store',
+            'show' => 'a.user.show',
+            'edit' => 'a.user.edit',
+            'update' => 'a.user.update',
+            'destroy' => 'a.user.destroy',
+        ]]);
         Route::put('a/product/{product}/main/{key}', 'ProductController@imageMain')->name('product.image.main');
         Route::delete('a/product/{product}/main/{key}', 'ProductController@imageDelete')->name('product.image.delete');
         Route::get('users', 'UserController@users');
@@ -209,6 +216,7 @@ Route::group(['middleware' => ['auth']], function () {
         Route::get('pair-reward/enable', 'PairRewardController@enable')->name('pair-reward.enable');
         Route::get('pair-reward/disable', 'PairRewardController@disable')->name('pair-reward.disable');
         Route::resource('pair-reward', 'PairRewardController');
+        Route::resource('trip-reward', 'TripRewardController');
     });
     Route::resource('userPin', 'UserPinController');
     Route::get('daily2', 'BonusController@daily2');
@@ -244,6 +252,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::resource('userRank', 'UserRankController');
     Route::resource('userTrip', 'UserTripController');
     Route::post('userTrip/generate', 'UserTripController@generate')->name('userTrip.generate');
+    Route::post('userTrip/{tripReward}/claim', 'UserTripController@claim')->name('userTrip.claim');
 });
 
 // api
