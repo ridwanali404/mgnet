@@ -216,30 +216,95 @@
                 </div>
             </div>
             
-            @if (isset($claimableRewards) && $claimableRewards->count() > 0)
-                <!-- Reward yang Bisa Diklaim -->
+            @if (isset($tripRewards) && $tripRewards->count() > 0)
+                <!-- List Trip Reward dengan Progress Bar -->
                 <div class="card mt-3">
                     <div class="card-body">
-                        <h3 class="card-title">Reward yang Tersedia</h3>
-                        <h6 class="card-subtitle">Reward yang dapat diklaim berdasarkan saldo tersedia</h6>
+                        <h3 class="card-title">Trip Reward yang Tersedia</h3>
+                        <h6 class="card-subtitle">Daftar semua trip reward yang dapat diklaim berdasarkan saldo tersedia</h6>
                         <div class="row mt-3">
-                            @foreach ($claimableRewards as $reward)
-                                <div class="col-md-4 mb-3">
-                                    <div class="card border-success">
+                            @foreach ($tripRewards as $reward)
+                                @php
+                                    $cardClass = 'border-secondary';
+                                    $progressColor = 'bg-secondary';
+                                    $statusBadge = '';
+                                    $buttonDisabled = false;
+                                    
+                                    if ($reward->status == 'claimed') {
+                                        $cardClass = 'border-info';
+                                        $progressColor = 'bg-info';
+                                        $statusBadge = '<span class="badge badge-info"><i class="mdi mdi-check-circle"></i> Sudah Diklaim</span>';
+                                        $buttonDisabled = true;
+                                    } elseif ($reward->status == 'claimable') {
+                                        $cardClass = 'border-success';
+                                        $progressColor = 'bg-success';
+                                        $statusBadge = '<span class="badge badge-success"><i class="mdi mdi-check-circle"></i> Siap Diklaim</span>';
+                                    } else {
+                                        $cardClass = 'border-warning';
+                                        $progressColor = 'bg-warning';
+                                        $statusBadge = '<span class="badge badge-warning"><i class="mdi mdi-clock-outline"></i> Saldo Belum Cukup</span>';
+                                        $buttonDisabled = true;
+                                    }
+                                @endphp
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card {{ $cardClass }} h-100 shadow-sm">
                                         <div class="card-body">
-                                            <h5 class="card-title">{{ $reward->name }}</h5>
-                                            <p class="card-text">
-                                                <strong>Rp {{ number_format($reward->nominal, 0, ',', '.') }}</strong>
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <h5 class="card-title mb-0">{{ $reward->name }}</h5>
+                                                {!! $statusBadge !!}
+                                            </div>
+                                            
+                                            <p class="card-text mb-3">
+                                                <strong class="text-primary" style="font-size: 1.2em;">
+                                                    Rp {{ number_format($reward->nominal, 0, ',', '.') }}
+                                                </strong>
                                                 @if ($reward->description)
                                                     <br><small class="text-muted">{{ $reward->description }}</small>
                                                 @endif
                                             </p>
-                                            <form action="{{ route('userTrip.claim', $reward->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin mengklaim reward {{ $reward->name }} (Rp {{ number_format($reward->nominal, 0, ',', '.') }})?');">
-                                                @csrf
-                                                <button type="submit" class="btn btn-success btn-block">
-                                                    <i class="mdi mdi-check"></i> Klaim Reward
+                                            
+                                            <!-- Progress Bar -->
+                                            <div class="mb-3">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <small class="text-muted">Progress</small>
+                                                    <small class="text-muted"><strong>{{ number_format($reward->progress, 1) }}%</strong></small>
+                                                </div>
+                                                <div class="progress" style="height: 20px; border-radius: 10px;">
+                                                    <div class="progress-bar {{ $progressColor }} progress-bar-striped progress-bar-animated" 
+                                                         role="progressbar" 
+                                                         style="width: {{ $reward->progress }}%;" 
+                                                         aria-valuenow="{{ $reward->progress }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        @if ($reward->progress >= 10)
+                                                            {{ number_format($reward->progress, 1) }}%
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted mt-1 d-block">
+                                                    Saldo tersedia: Rp {{ number_format($availableBalance, 0, ',', '.') }} 
+                                                    / Rp {{ number_format($reward->nominal, 0, ',', '.') }}
+                                                </small>
+                                            </div>
+                                            
+                                            <!-- Tombol Klaim -->
+                                            @if ($reward->can_claim)
+                                                <form action="{{ route('userTrip.claim', $reward->id) }}" method="POST" 
+                                                      onsubmit="return confirm('Apakah Anda yakin ingin mengklaim reward {{ $reward->name }} (Rp {{ number_format($reward->nominal, 0, ',', '.') }})? Saldo akan dikurangi sebesar Rp {{ number_format($reward->nominal, 0, ',', '.') }}.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-success btn-block btn-lg">
+                                                        <i class="mdi mdi-check-circle"></i> Klaim Reward
+                                                    </button>
+                                                </form>
+                                            @elseif ($reward->already_claimed)
+                                                <button type="button" class="btn btn-info btn-block btn-lg" disabled>
+                                                    <i class="mdi mdi-check-circle"></i> Sudah Diklaim
                                                 </button>
-                                            </form>
+                                            @else
+                                                <button type="button" class="btn btn-secondary btn-block btn-lg" disabled>
+                                                    <i class="mdi mdi-lock"></i> Saldo Belum Cukup
+                                                </button>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>

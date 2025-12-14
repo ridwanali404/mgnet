@@ -161,22 +161,38 @@ class UserTripController extends Controller
             $claimedAmount = $currentYearSaving ? $currentYearSaving->claimed_amount : 0;
             $availableBalance = $totalAccumulation - $claimedAmount;
             
-            // Ambil semua trip rewards yang aktif
+            // Ambil semua trip rewards yang aktif (untuk ditampilkan semua dengan progress bar)
             $tripRewards = TripReward::where('is_active', true)->orderBy('nominal')->get();
             
-            // Filter reward yang bisa diklaim (saldo tersedia >= nominal dan belum pernah diklaim)
-            $claimableRewards = $tripRewards->filter(function ($reward) use ($user, $availableBalance) {
-                // Cek apakah saldo tersedia >= nominal reward
-                if ($availableBalance < $reward->nominal) {
-                    return false;
-                }
-                
+            // Untuk setiap reward, hitung status dan progress
+            $tripRewards = $tripRewards->map(function ($reward) use ($user, $availableBalance) {
                 // Cek apakah sudah pernah diklaim
                 $alreadyClaimed = UserTripReward::where('user_id', $user->id)
                     ->where('trip_reward_id', $reward->id)
                     ->exists();
                 
-                return !$alreadyClaimed;
+                // Hitung progress (persentase saldo tersedia terhadap nominal reward)
+                $progress = $availableBalance > 0 ? min(100, ($availableBalance / $reward->nominal) * 100) : 0;
+                
+                // Status: 'claimed', 'claimable', 'insufficient'
+                $status = 'insufficient';
+                if ($alreadyClaimed) {
+                    $status = 'claimed';
+                } elseif ($availableBalance >= $reward->nominal) {
+                    $status = 'claimable';
+                }
+                
+                $reward->status = $status;
+                $reward->progress = round($progress, 2);
+                $reward->already_claimed = $alreadyClaimed;
+                $reward->can_claim = !$alreadyClaimed && $availableBalance >= $reward->nominal;
+                
+                return $reward;
+            });
+            
+            // Filter reward yang bisa diklaim (untuk kompatibilitas dengan view lama)
+            $claimableRewards = $tripRewards->filter(function ($reward) {
+                return $reward->can_claim;
             });
             
             // Ambil histori reward yang sudah diklaim
@@ -186,7 +202,18 @@ class UserTripController extends Controller
                 ->get();
         }
         
-        return view('userTrip', compact('userTripDailies', 'userTripSavings', 'isQualified', 'qualificationReasons', 'selectedDate', 'dailyInfo', 'tripRewards', 'claimableRewards', 'claimedRewards'));
+        // Untuk member, kirim juga availableBalance ke view
+        if (Auth::user()->type == 'member') {
+            $currentYear = date('Y');
+            $currentYearSaving = $userTripSavings->where('year', $currentYear)->first();
+            $totalAccumulation = $currentYearSaving ? $currentYearSaving->yearly_accumulation : 0;
+            $claimedAmount = $currentYearSaving ? $currentYearSaving->claimed_amount : 0;
+            $availableBalance = $totalAccumulation - $claimedAmount;
+        } else {
+            $availableBalance = 0;
+        }
+        
+        return view('userTrip', compact('userTripDailies', 'userTripSavings', 'isQualified', 'qualificationReasons', 'selectedDate', 'dailyInfo', 'tripRewards', 'claimableRewards', 'claimedRewards', 'availableBalance'));
     }
     
     /**
