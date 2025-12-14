@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Product;
 use App\Models\ActiveWeek;
+use App\Traits\Helper;
 
 class OfficialTransactionController extends Controller
 {
@@ -191,6 +192,12 @@ class OfficialTransactionController extends Controller
                 'month_key' => 1,
             ]);
         }
+        
+        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif
+        if ($user) {
+            Helper::checkAndTriggerAutoROFromPV($user, $officialTransaction->poin);
+        }
+        
         Session::flash('success', 'Transaksi berhasil dibuat');
         return back();
     }
@@ -247,6 +254,12 @@ class OfficialTransactionController extends Controller
         $officialTransaction->update([
             'status' => 'paid',
         ]);
+        
+        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi paid)
+        if ($officialTransaction->user) {
+            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, $officialTransaction->poin);
+        }
+        
         // check big transaction
         if ($officialTransaction->product->is_big) {
             $created_at = Carbon::parse($officialTransaction->created_at);
@@ -320,6 +333,12 @@ class OfficialTransactionController extends Controller
                 'status' => 'received'
             )
         );
+        
+        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi received)
+        if ($is_updated && $officialTransaction->user) {
+            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, $officialTransaction->poin);
+        }
+        
         if ($is_updated)
             Session::flash('success', 'Updated');
         else

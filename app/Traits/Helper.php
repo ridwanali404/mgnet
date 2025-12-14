@@ -1811,6 +1811,100 @@ trait Helper
     }
 
     /**
+     * Cek dan trigger Auto RO berdasarkan 170 PV dalam masa aktif
+     * Mirip dengan Automaintain, tapi trigger dari belanja online yang mencapai 170 PV
+     * Dipanggil setelah transaksi dibuat (Transaction atau OfficialTransaction)
+     */
+    public static function checkAndTriggerAutoROFromPV($user, $transactionPoin = 0)
+    {
+        // Cek apakah user masih dalam masa aktif
+        if (!$user->active_until) {
+            return false;
+        }
+
+        // Cek apakah user punya pin Gold, Gold Upgrade Platinum, atau Platinum
+        $userPin = $user->premiumUserPin;
+        if (!$userPin || !$userPin->pin) {
+            return false;
+        }
+
+        $pin = $userPin->pin;
+        
+        // Hanya untuk base pin: Gold, Gold Upgrade Platinum, atau Platinum
+        if (!in_array($pin->name, ['Gold', 'Gold Upgrade Platinum', 'Platinum'])) {
+            return false;
+        }
+
+        // Hitung total PV yang terkumpul dalam masa aktif (dari tanggal mulai aktif sampai sekarang)
+        $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
+        $activeUntil = Carbon::parse($user->active_until);
+        
+        // Hitung PV dari transaksi umum dalam masa aktif
+        $transactionPoinTotal = Transaction::where('user_id', $user->id)
+            ->where('type', 'general')
+            ->where('poin', '>', 0)
+            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+            ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+            ->sum('poin');
+        
+        // Tambahkan poin dari transaksi yang baru saja dibuat (jika ada)
+        $transactionPoinTotal += $transactionPoin;
+        
+        // Hitung PV dari official transaction dalam masa aktif
+        $officialPoin = OfficialTransaction::where('user_id', $user->id)
+            ->where('poin', '>', 0)
+            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+            ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+            ->sum('poin');
+        
+        // Hitung PV dari daily poin dalam masa aktif
+        $dailyPoinPV = $user->dailyPoins()
+            ->where('pv', '>', 0)
+            ->whereBetween('date', [$activeFrom->format('Y-m-d'), $activeUntil->format('Y-m-d')])
+            ->sum('pv');
+        
+        $totalPVInActive = $transactionPoinTotal + $officialPoin + $dailyPoinPV;
+        
+        // Cek apakah sudah mencapai 170 PV dalam masa aktif
+        if ($totalPVInActive >= 170) {
+            // Cek apakah sudah pernah RO dalam periode aktif ini (untuk menghindari double RO)
+            $hasROInActivePeriod = $user->userPins()
+                ->whereHas('pin', function($q) use ($pin) {
+                    $q->where('name', $pin->name);
+                })
+                ->where('is_ro', true)
+                ->where('is_used', true)
+                ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+                ->exists();
+            
+            // Jika belum pernah RO dalam periode aktif ini, trigger Auto RO
+            if (!$hasROInActivePeriod) {
+                // Buat UserPin dengan base pin yang sama, tapi ditandai sebagai RO
+                $roUserPin = $user->userPins()->create([
+                    'buyer_id' => $user->id,
+                    'pin_id' => $pin->id,
+                    'code' => strtoupper(str_random(6)),
+                    'name' => $pin->name,
+                    'price' => $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
+                    'level' => $pin->level,
+                    'is_used' => true,
+                    'is_ro' => true, // Tandai sebagai Repeat Order
+                ]);
+                
+                Helper::pinHistory($roUserPin);
+                Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
+                
+                // Perpanjang masa aktif 45 hari dari Auto RO
+                Helper::extendActiveStatus($user, 'auto_ro_170pv');
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
      * Cek dan update status aktif user
      * Dipanggil setiap hari untuk mengecek masa aktif
      */

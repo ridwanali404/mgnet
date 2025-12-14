@@ -338,6 +338,9 @@ class TransactionController extends Controller
             // Cek dan perpanjang masa aktif jika belanja RO >= 1.7 juta (dalam masa aktif)
             if ($user && $transaction->type == 'general') {
                 Helper::checkAndExtendActiveFromRO($user, $transaction->price);
+                
+                // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif
+                Helper::checkAndTriggerAutoROFromPV($user, $transaction->poin);
             }
         }
         // add official_transaction_stockists stocks
@@ -412,6 +415,12 @@ class TransactionController extends Controller
         $is_updated = $transaction->update(array(
             'status' => 'received'
         ));
+        
+        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi received)
+        if ($is_updated && $transaction->user && $transaction->type == 'general') {
+            Helper::checkAndTriggerAutoROFromPV($transaction->user, $transaction->poin);
+        }
+        
         if($is_updated) Session::flash('success', 'Updated');
         else Session::flash('error', 'Error while confirm');
         return back();
