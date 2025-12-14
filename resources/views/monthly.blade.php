@@ -784,20 +784,20 @@
                     </div>
                     <div class="card">
                         <div class="card-body">
-                            <h4 class="card-title">Historis Harian Profit Sharing <span
+                            <h4 class="card-title">Historis Harian Global Profit Sharing <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
-                            <h6 class="card-subtitle">Riwayat profit sharing per hari untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (batas jam 23:59 WIB auto-counting)</h6>
+                            <h6 class="card-subtitle">Riwayat Global Profit Sharing per member untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (klik untuk melihat breakdown per tanggal)</h6>
                             <div class="table-responsive">
-                                <table id="admin-monthly-profit-sharing-daily"
+                                <table id="admin-monthly-global-profit-sharing-daily"
                                     class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
                                     width="100%">
                                     <thead>
                                         <tr>
+                                            <th></th>
                                             <th>#</th>
                                             <th>Username</th>
                                             <th>Nama</th>
-                                            <th>Tanggal</th>
-                                            <th class="text-right">Profit Sharing (Rp)</th>
+                                            <th class="text-right">Total Global Profit Sharing (Rp)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -805,10 +805,42 @@
                                             $counter = 1;
                                             $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
                                             $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+                                            
+                                            // Ambil semua Platinum perdana aktif
+                                            $platinumUsers = \App\Models\User::whereHas('profitSharings', function ($q) {
+                                                $q->where('is_perdana_platinum', true);
+                                            })
+                                            ->whereHas('premiumUserPin', function ($q) {
+                                                $q->whereHas('pin', function ($qPin) {
+                                                    $qPin->where('name', 'Platinum')->where('type', 'premium');
+                                                });
+                                            })
+                                            ->where('is_active', true)
+                                            ->get();
                                         @endphp
-                                        @foreach ($users as $user)
-                                            @foreach ($user->dailyProfitSharingHistory($month)->get() as $daily)
-                                                <tr>
+                                        @foreach ($platinumUsers as $user)
+                                            @php
+                                                // Ambil GPS daily untuk bulan tersebut
+                                                $gpsDaily = $user->globalProfitSharingDailies()
+                                                    ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                                                    ->orderBy('date', 'desc')
+                                                    ->get();
+                                                
+                                                $totalGps = $gpsDaily->sum('amount');
+                                                
+                                                // Simpan data GPS daily sebagai JSON untuk digunakan di JavaScript
+                                                $gpsDailyData = $gpsDaily->map(function($daily) {
+                                                    return [
+                                                        'date' => \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y'),
+                                                        'amount' => number_format($daily->amount, 0, ',', '.')
+                                                    ];
+                                                })->toJson();
+                                            @endphp
+                                            @if($totalGps > 0)
+                                                <tr data-user-id="{{ $user->id }}" data-gps-daily='{{ $gpsDailyData }}'>
+                                                    <td class="details-control" style="cursor: pointer; text-align: center;">
+                                                        <i class="mdi mdi-plus-circle text-primary"></i>
+                                                    </td>
                                                     <td>{{ $counter++ }}</td>
                                                     <td>
                                                         <a href="{{ url('user/' . $user->id . '/profile') }}">
@@ -816,12 +848,11 @@
                                                         </a>
                                                     </td>
                                                     <td>{{ $user->name }}</td>
-                                                    <td><code>{{ \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y') }}</code></td>
                                                     <td class="text-right">
-                                                        <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
+                                                        <code>{{ number_format($totalGps, 0, ',', '.') }}</code>
                                                     </td>
                                                 </tr>
-                                            @endforeach
+                                            @endif
                                         @endforeach
                                     </tbody>
                                 </table>
@@ -1683,17 +1714,62 @@
                         url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
-                $('#admin-monthly-profit-sharing-daily').DataTable({
+                // Format function untuk child rows
+                function format (gpsDailyData) {
+                    var table = '<table class="table table-sm table-bordered" style="margin-left: 50px; width: calc(100% - 50px);">' +
+                        '<thead>' +
+                        '<tr>' +
+                        '<th>Tanggal</th>' +
+                        '<th class="text-right">Global Profit Sharing (Rp)</th>' +
+                        '</tr>' +
+                        '</thead>' +
+                        '<tbody>';
+                    
+                    if (gpsDailyData && gpsDailyData.length > 0) {
+                        gpsDailyData.forEach(function(daily) {
+                            table += '<tr>' +
+                                '<td><code>' + daily.date + '</code></td>' +
+                                '<td class="text-right"><code>' + daily.amount + '</code></td>' +
+                                '</tr>';
+                        });
+                    } else {
+                        table += '<tr><td colspan="2" class="text-center">Tidak ada data</td></tr>';
+                    }
+                    
+                    table += '</tbody></table>';
+                    return table;
+                }
+                
+                var table = $('#admin-monthly-global-profit-sharing-daily').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
                         'copy', 'csv', 'excel', 'pdf', 'print'
                     ],
                     order: [
-                        [3, "desc"]
+                        [4, "desc"]
                     ],
                     language: {
                         url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
+                });
+                
+                // Handle click pada tombol expand/collapse
+                $('#admin-monthly-global-profit-sharing-daily tbody').on('click', 'td.details-control', function () {
+                    var tr = $(this).closest('tr');
+                    var row = table.row(tr);
+                    var gpsDailyData = JSON.parse(tr.attr('data-gps-daily'));
+                    
+                    if (row.child.isShown()) {
+                        // Tutup row
+                        row.child.hide();
+                        tr.removeClass('shown');
+                        $(this).find('i').removeClass('mdi-minus-circle').addClass('mdi-plus-circle');
+                    } else {
+                        // Buka row
+                        row.child(format(gpsDailyData)).show();
+                        tr.addClass('shown');
+                        $(this).find('i').removeClass('mdi-plus-circle').addClass('mdi-minus-circle');
+                    }
                 });
             });
         </script>
