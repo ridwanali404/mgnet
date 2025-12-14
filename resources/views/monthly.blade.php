@@ -92,7 +92,7 @@
                         $bonus_total = $bonus - $tax - $administrative;
                     @endphp
                     @if ($bonus_total > 50000)
-                        @if ($monthly_bonuses->first()->paid_at)
+                        @if ($monthly_bonuses->first() && $monthly_bonuses->first()->paid_at)
                             <div class="alert alert-success">Bonus bulan
                                 {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}
                                 sejumlah
@@ -579,7 +579,7 @@
                                                     $status_html = '<span class="label label-danger">Belum qualified</span>';
                                                     $status = 'Belum qualified';
                                                 } else {
-                                                    if ($monthly_bonus->paid_at) {
+                                                    if ($monthly_bonus && $monthly_bonus->paid_at) {
                                                         $status_html = '<span class="label label-primary">Sudah dibayar</span>';
                                                         $status = 'Sudah dibayar';
                                                     } elseif ($monthly_total >= 50000) {
@@ -640,7 +640,7 @@
                                                 </td>
                                                 <td class="text-right">
                                                     @if ($monthly_qualified)
-                                                        @if (!$monthly_bonus->paid_at)
+                                                        @if (!$monthly_bonus || !$monthly_bonus->paid_at)
                                                             @if ($status != 'Menunggu pembayaran')
                                                                 <button class="btn btn-xs btn-rounded btn-success"
                                                                     data-toggle="modal"
@@ -655,7 +655,7 @@
                                                 </td>
                                                 <td class="d-none">{{ $a->id }}</td>
                                                 <td class="d-none">
-                                                    {{ $monthly_qualified && !$monthly_bonus->paid_at ? 1 : 0 }}
+                                                    {{ $monthly_qualified && (!$monthly_bonus || !$monthly_bonus->paid_at) ? 1 : 0 }}
                                                 </td>
                                             </tr>
                                         @endforeach
