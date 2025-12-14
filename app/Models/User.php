@@ -684,6 +684,11 @@ class User extends Authenticatable
         return $this->hasMany(Topup::class);
     }
 
+    public function withdrawAutomaintains()
+    {
+        return $this->hasMany(WithdrawAutomaintain::class);
+    }
+
     public function isAlreadyAutomaintain($month)
     {
         return $this->userService()->isAlreadyAutomaintain($this, $month);

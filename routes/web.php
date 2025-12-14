@@ -244,6 +244,8 @@ Route::group(['middleware' => ['auth']], function () {
     Route::put('user-reward/{reward}/claim', 'UserRewardController@claim')->name('userReward.claim');
     Route::put('user-reward/{userReward}/confirm', 'UserRewardController@confirm')->name('userReward.confirm');
     Route::post('automaintain/claim', 'AutomaintainController@claim')->name('automaintain.claim');
+    Route::post('automaintain/withdraw/{user}', 'AutomaintainController@withdraw')->name('automaintain.withdraw');
+    Route::post('automaintain/withdraw/{withdrawAutomaintain}/cancel', 'AutomaintainController@cancelWithdraw')->name('automaintain.withdraw.cancel');
     Route::get('automaintain', 'AutomaintainController@index')->name('automaintain.index');
     Route::patch('topup/{topup}/confirm', 'TopupController@confirm')->name('topup.confirm');
     Route::resource('topup', 'TopupController');

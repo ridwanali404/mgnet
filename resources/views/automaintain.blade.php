@@ -415,6 +415,7 @@
                                     <th>Username</th>
                                     <th class="text-right">Saldo Automaintain (Rp)</th>
                                     <th>Tanggal Terakhir Update</th>
+                                    <th class="text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -430,6 +431,11 @@
                                         <td>
                                             <code>{{ $member->last_automaintain_update ? $member->last_automaintain_update->format('Y-m-d H:i:s') : '-' }}</code>
                                         </td>
+                                        <td class="text-center">
+                                            <a class="btn btn-xs btn-info btn-rounded" href="#withdraw-{{ $member->id }}" data-toggle="modal">
+                                                Withdraw
+                                            </a>
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -439,6 +445,7 @@
                                     <th class="text-right" id="total-automaintain">
                                         <code>{{ number_format($membersWithAutomaintain->sum('cash_automaintain'), 0, ',', '.') }}</code>
                                     </th>
+                                    <th></th>
                                     <th></th>
                                 </tr>
                             </tfoot>
@@ -470,6 +477,111 @@
                                         </td>
                                         <td>
                                             <code>{{ $member->last_automaintain_date ? $member->last_automaintain_date->format('Y-m-d H:i:s') : '-' }}</code>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+        @if (auth()->user()->type == 'admin')
+            @foreach ($membersWithAutomaintain as $member)
+                <div class="modal inmodal" id="withdraw-{{ $member->id }}" role="dialog" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content animated fadeInDown">
+                            <form action="{{ route('automaintain.withdraw', $member) }}" method="POST">
+                                @csrf
+                                <div class="modal-header">
+                                    <h4 class="modal-title">Withdraw Saldo Automaintain</h4>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="form-group">
+                                        <label>Member</label>
+                                        <input type="text" class="form-control" value="{{ $member->username }}" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Saldo Automaintain</label>
+                                        <input type="text" class="form-control" value="Rp {{ number_format($member->cash_automaintain, 0, ',', '.') }}" readonly>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Nominal Withdraw (Rp)</label>
+                                        <input type="number" class="form-control" name="amount" min="1" max="{{ $member->cash_automaintain }}" required>
+                                        <small class="text-muted">Maksimal: Rp {{ number_format($member->cash_automaintain, 0, ',', '.') }}</small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-rounded btn-secondary" data-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-rounded btn-info">Withdraw</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        @endif
+        @if (auth()->user()->type == 'admin' && $withdrawHistory->count() > 0)
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Histori Withdraw Automaintain</h3>
+                    <div class="table-responsive">
+                        <table id="withdraw-history-table" class="display nowrap table table-hover table-striped table-bordered"
+                            cellspacing="0" width="100%">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Tanggal</th>
+                                    <th>Member</th>
+                                    <th class="text-right">Nominal (Rp)</th>
+                                    <th>Status</th>
+                                    <th>Tanggal Selesai</th>
+                                    <th>Tanggal Dibatalkan</th>
+                                    <th class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($withdrawHistory as $key => $withdraw)
+                                    <tr>
+                                        <td>{{ $key + 1 }}</td>
+                                        <td><code>{{ $withdraw->created_at->format('Y-m-d H:i:s') }}</code></td>
+                                        <td>
+                                            @if ($withdraw->user)
+                                                <a href="{{ url('user/' . $withdraw->user->id . '/profile') }}">{{ $withdraw->user->username }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="text-right" data-order="{{ $withdraw->amount }}">
+                                            <code>{{ number_format($withdraw->amount, 0, ',', '.') }}</code>
+                                        </td>
+                                        <td>
+                                            @if ($withdraw->status == 'completed')
+                                                <span class="label label-rounded label-success">Selesai</span>
+                                            @elseif ($withdraw->status == 'cancelled')
+                                                <span class="label label-rounded label-danger">Dibatalkan</span>
+                                            @else
+                                                <span class="label label-rounded label-warning">Pending</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <code>{{ $withdraw->completed_at ? \Carbon\Carbon::parse($withdraw->completed_at)->format('Y-m-d H:i:s') : '-' }}</code>
+                                        </td>
+                                        <td>
+                                            <code>{{ $withdraw->cancelled_at ? \Carbon\Carbon::parse($withdraw->cancelled_at)->format('Y-m-d H:i:s') : '-' }}</code>
+                                        </td>
+                                        <td class="text-center">
+                                            @if ($withdraw->status != 'cancelled')
+                                                <form action="{{ route('automaintain.withdraw.cancel', $withdraw) }}" method="POST" style="display: inline;">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-danger btn-rounded" onclick="return confirm('Apakah Anda yakin membatalkan withdraw ini?')">
+                                                        Batal
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -552,6 +664,18 @@
                     'copy', 'csv', 'excel', 'pdf', 'print'
                 ],
                 "order": [[ 2, "desc" ]]
+            });
+            @endif
+            @if (auth()->user()->type == 'admin' && $withdrawHistory->count() > 0)
+            $('#withdraw-history-table').DataTable({
+                "language": {
+                    "url": "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Indonesian.json"
+                },
+                dom: 'Bfrtip',
+                buttons: [
+                    'copy', 'csv', 'excel', 'pdf', 'print'
+                ],
+                "order": [[ 1, "desc" ]]
             });
             @endif
         });
