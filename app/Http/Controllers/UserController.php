@@ -266,6 +266,18 @@ class UserController extends Controller
             'username' => 'required|unique:users,username,' . $user->id,
         ]);
         $rr = $request->all();
+        
+        // KRUSIAL: Lock data bank dan NPWP setelah registrasi
+        // Hanya admin yang bisa mengubah data bank (bank_id, bank_account, bank_as) dan NPWP
+        // Ini untuk mencegah upline mengubah data bank member setelah registrasi
+        if (Auth::user()->type != 'admin') {
+            // Hapus field bank dan NPWP dari request untuk non-admin
+            unset($rr['bank_id']);
+            unset($rr['bank_account']);
+            unset($rr['bank_as']);
+            unset($rr['npwp']);
+        }
+        
         if (!isset($rr['password']) || $rr['password'] == null || $rr['password'] == '') {
             unset($rr['password']);
         } else {

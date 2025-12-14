@@ -1867,23 +1867,30 @@ trait Helper
         
         // Cek apakah sudah mencapai 170 PV dalam masa aktif
         if ($totalPVInActive >= 170) {
-            // Cek apakah sudah pernah RO dalam periode aktif ini (untuk menghindari double RO)
-            $hasROInActivePeriod = $user->userPins()
+            // Hitung berapa kali Auto RO seharusnya sudah dibuat berdasarkan kelipatan 170 PV
+            // Setiap kelipatan 170 PV = 1 Auto RO (170, 340, 510, 680, dst)
+            $expectedAutoROCount = floor($totalPVInActive / 170);
+            
+            // Hitung berapa Auto RO yang sudah ada dalam masa aktif
+            $existingAutoROCount = $user->userPins()
                 ->whereHas('pin', function($q) use ($pin) {
                     $q->where('name', $pin->name);
                 })
                 ->where('is_ro', true)
                 ->where('is_used', true)
                 ->whereBetween('created_at', [$activeFrom, Carbon::now()])
-                ->exists();
+                ->count();
             
-            // Jika belum pernah RO dalam periode aktif ini, trigger Auto RO
-            if (!$hasROInActivePeriod) {
-                // Buat UserPin dengan base pin yang sama, tapi ditandai sebagai RO
+            // Jika masih ada Auto RO yang belum dibuat, buat yang terlewat
+            // Untuk real-time trigger, hanya buat 1 Auto RO per transaksi (yang terlewat saat ini)
+            // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
+            if ($expectedAutoROCount > $existingAutoROCount) {
+                // Buat 1 Auto RO yang terlewat (untuk real-time trigger)
+                // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
                 $roUserPin = $user->userPins()->create([
                     'buyer_id' => $user->id,
                     'pin_id' => $pin->id,
-                    'code' => strtoupper(str_random(6)),
+                    'code' => strtoupper(\Illuminate\Support\Str::random(6)),
                     'name' => $pin->name,
                     'price' => $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
                     'level' => $pin->level,

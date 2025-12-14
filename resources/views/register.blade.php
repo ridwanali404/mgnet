@@ -286,6 +286,14 @@
                                     @endif
                                 </div>
                             </div>
+                            <div class="form-group row">
+                                <div class="col-sm-9 offset-sm-3">
+                                    <div class="alert alert-danger" role="alert" style="border: 2px solid #dc3545; border-radius: 4px; padding: 12px; margin-bottom: 0;">
+                                        <strong><i class="mdi mdi-alert-circle"></i> PENTING:</strong><br>
+                                        Mohon masukkan Data Bank lengkap dengan benar, karena untuk mengubah profil data bank harus melalui Admin Perusahaan.
+                                    </div>
+                                </div>
+                            </div>
                             <hr />
                             <div class="form-group row">
                                 <div class="col-sm-9 offset-sm-3">
