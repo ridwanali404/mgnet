@@ -253,15 +253,29 @@ class BonusController extends Controller
         $date = DateTime::createFromFormat('Y-m', $month);
         $closing = \App\Models\MonthlyClosing::whereYear('created_at', date('Y', strtotime(request()->get('month') ?? date('Y-m'))))->whereMonth('created_at', date('m', strtotime(request()->get('month') ?? date('Y-m'))))->count();
         if (in_array(Auth::user()->type, ['admin', 'cradmin'])) {
-            $users = User::where('type', 'member')->whereHas('bonuses', function ($q_bonuses) use ($month) {
-                $q_bonuses->whereYear('created_at', date('Y', strtotime($month)))->whereMonth('created_at', date('m', strtotime($month)))->where(function ($q) {
-                    $q->where('type', 'Komisi Penjualan');
-                    $q->orWhere('type', 'Bonus Unilevel RO');
-                    $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
-                    $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
-                    $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
-                });
-            })
+            // Ambil user yang memiliki bonus bulanan atau GPS saving
+            $users = User::where('type', 'member')
+                ->where(function ($query) use ($month) {
+                    // User yang memiliki bonus bulanan
+                    $query->whereHas('bonuses', function ($q_bonuses) use ($month) {
+                        $q_bonuses->whereYear('created_at', date('Y', strtotime($month)))
+                            ->whereMonth('created_at', date('m', strtotime($month)))
+                            ->where(function ($q) {
+                                $q->where('type', 'Komisi Penjualan');
+                                $q->orWhere('type', 'Bonus Unilevel RO');
+                                $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
+                                $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
+                                $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
+                                $q->orWhere('type', 'Bonus Profit Sharing');
+                                $q->orWhere('type', 'Bonus Global Profit Sharing');
+                                $q->orWhere('type', 'Bonus Power Plus');
+                            });
+                    })
+                    // Atau user yang memiliki GPS saving dengan wallet_cashback > 0 (belum closing)
+                    ->orWhereHas('globalProfitSharingSavings', function ($q) {
+                        $q->where('wallet_cashback', '>', 0);
+                    });
+                })
                 ->with(['bank'])
                 ->oldest()
                 ->get();
