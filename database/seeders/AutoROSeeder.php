@@ -226,6 +226,7 @@ class AutoROSeeder extends Seeder
                             $roDatesToCreate = array_slice($roDates, $existingAutoROCount, $missingAutoROCount);
                             
                             // Buat Auto RO yang terlewat
+                            $createdCount = 0;
                             foreach ($roDatesToCreate as $roDate) {
                                 $roUserPin = $user->userPins()->create([
                                     'buyer_id' => $user->id,
@@ -244,12 +245,18 @@ class AutoROSeeder extends Seeder
                                 Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
                                 
                                 $created++;
+                                $createdCount++;
                                 $this->command->info("✓ Auto RO dibuat untuk {$user->username} (PV: {$totalPVInActive}, Expected: {$expectedAutoROCount}, Existing: {$existingAutoROCount}, Tanggal: {$roDate->format('Y-m-d H:i:s')})");
                             }
                             
-                            // Perpanjang masa aktif 45 hari dari Auto RO (jika belum diperpanjang)
-                            if ($user->active_until) {
-                                Helper::extendActiveStatus($user, 'auto_ro_170pv');
+                            // Perpanjang masa aktif 45 hari untuk setiap Auto RO yang dibuat
+                            // Setiap Auto RO memperpanjang masa aktif 45 hari
+                            if ($createdCount > 0 && $user->active_until) {
+                                $newActiveUntil = Carbon::parse($user->active_until)->addDays(45 * $createdCount);
+                                $user->update([
+                                    'active_until' => $newActiveUntil,
+                                    'is_active' => true,
+                                ]);
                             }
                             
                             DB::commit();

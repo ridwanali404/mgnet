@@ -1911,9 +1911,8 @@ trait Helper
                 ->where('created_at', '<=', $activeUntil)
                 ->count();
             
-            // Jika masih ada Auto RO yang belum dibuat, buat yang terlewat
-            // Untuk real-time trigger, hanya buat 1 Auto RO per transaksi (yang terlewat saat ini)
-            // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
+            // Jika masih ada Auto RO yang belum dibuat, buat semua yang terlewat sekaligus
+            // Setiap Auto RO dibuat dengan tanggal sesuai milestone PV (170, 340, 510, dst)
             if ($expectedAutoROCount > $existingAutoROCount) {
                 // Gunakan database lock untuk mencegah race condition dan duplikasi
                 // Lock user record untuk memastikan hanya 1 proses yang membuat Auto RO pada saat yang sama
@@ -1944,26 +1943,120 @@ trait Helper
                     
                     // Jika masih ada Auto RO yang belum dibuat setelah lock
                     if ($expectedAutoROCount > $existingAutoROCountAfterLock) {
-                        // Buat 1 Auto RO yang terlewat (untuk real-time trigger)
-                        // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
-                        $roUserPin = $userLocked->userPins()->create([
-                            'buyer_id' => $userLocked->id,
-                            'pin_id' => $pin->id,
-                            'code' => strtoupper(\Illuminate\Support\Str::random(6)),
-                            'name' => $pin->name,
-                            'price' => $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
-                            'level' => $pin->level,
-                            'is_used' => true,
-                            'is_ro' => true, // Tandai sebagai Repeat Order
-                        ]);
+                        $missingAutoROCount = $expectedAutoROCount - $existingAutoROCountAfterLock;
                         
-                        Helper::pinHistory($roUserPin);
-                        Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
+                        // Kumpulkan semua transaksi untuk menentukan tanggal Auto RO berdasarkan milestone PV
+                        $allTransactions = collect();
                         
-                        // Perpanjang masa aktif 45 hari dari Auto RO
-                        Helper::extendActiveStatus($userLocked, 'auto_ro_170pv');
+                        // Ambil transaksi umum
+                        $transactions = Transaction::where('user_id', $userLocked->id)
+                            ->where('type', 'general')
+                            ->where('poin', '>', 0)
+                            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+                            ->where('created_at', '<=', $activeUntil)
+                            ->orderBy('created_at', 'asc')
+                            ->get();
+                        
+                        foreach ($transactions as $t) {
+                            $allTransactions->push([
+                                'date' => Carbon::parse($t->created_at),
+                                'poin' => $t->poin,
+                            ]);
+                        }
+                        
+                        // Ambil official transaction
+                        $officialTransactions = OfficialTransaction::where('user_id', $userLocked->id)
+                            ->where('poin', '>', 0)
+                            ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
+                            ->where('created_at', '<=', $activeUntil)
+                            ->orderBy('created_at', 'asc')
+                            ->get();
+                        
+                        foreach ($officialTransactions as $ot) {
+                            $allTransactions->push([
+                                'date' => Carbon::parse($ot->created_at),
+                                'poin' => $ot->poin,
+                            ]);
+                        }
+                        
+                        // Ambil daily poin
+                        $dailyPoins = $userLocked->dailyPoins()
+                            ->where('pv', '>', 0)
+                            ->whereBetween('date', [$activeFrom->format('Y-m-d'), $activeUntil->format('Y-m-d')])
+                            ->orderBy('date', 'asc')
+                            ->get();
+                        
+                        foreach ($dailyPoins as $dp) {
+                            $allTransactions->push([
+                                'date' => Carbon::parse($dp->date),
+                                'poin' => $dp->pv,
+                            ]);
+                        }
+                        
+                        // Urutkan semua berdasarkan tanggal
+                        $allTransactions = $allTransactions->sortBy('date');
+                        
+                        // Tentukan tanggal untuk setiap Auto RO berdasarkan milestone PV
+                        $accumulatedPV = 0;
+                        $roDates = [];
+                        
+                        foreach ($allTransactions as $item) {
+                            $accumulatedPV += $item['poin'];
+                            
+                            // Cek setiap kelipatan 170 PV
+                            $currentExpectedRO = floor($accumulatedPV / 170);
+                            
+                            // Jika ada Auto RO baru yang seharusnya dibuat
+                            while ($currentExpectedRO > count($roDates)) {
+                                $roDates[] = $item['date'];
+                            }
+                        }
+                        
+                        // Jika masih kurang (misalnya karena ada gap), gunakan tanggal terakhir transaksi atau waktu sekarang
+                        while (count($roDates) < $expectedAutoROCount) {
+                            $lastDate = $allTransactions->last() ? $allTransactions->last()['date'] : Carbon::now();
+                            $roDates[] = $lastDate;
+                        }
+                        
+                        // Ambil hanya tanggal untuk Auto RO yang terlewat (mulai dari yang sudah ada)
+                        $roDatesToCreate = array_slice($roDates, $existingAutoROCountAfterLock, $missingAutoROCount);
+                        
+                        // Buat semua Auto RO yang terlewat
+                        $createdCount = 0;
+                        foreach ($roDatesToCreate as $roDate) {
+                            $roUserPin = $userLocked->userPins()->create([
+                                'buyer_id' => $userLocked->id,
+                                'pin_id' => $pin->id,
+                                'code' => strtoupper(\Illuminate\Support\Str::random(6)),
+                                'name' => $pin->name,
+                                'price' => $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
+                                'level' => $pin->level,
+                                'is_used' => true,
+                                'is_ro' => true, // Tandai sebagai Repeat Order
+                                'created_at' => $roDate,
+                                'updated_at' => $roDate,
+                            ]);
+                            
+                            Helper::pinHistory($roUserPin);
+                            Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
+                            
+                            $createdCount++;
+                        }
+                        
+                        // Perpanjang masa aktif 45 hari untuk setiap Auto RO yang dibuat
+                        // Setiap Auto RO memperpanjang masa aktif 45 hari
+                        if ($createdCount > 0 && $userLocked->active_until) {
+                            $newActiveUntil = Carbon::parse($userLocked->active_until)->addDays(45 * $createdCount);
+                            $userLocked->update([
+                                'active_until' => $newActiveUntil,
+                                'is_active' => true,
+                            ]);
+                        }
                         
                         DB::commit();
+                        
+                        \Log::info("Auto RO dibuat untuk {$userLocked->username}: {$createdCount} Auto RO (PV: {$totalPVInActive}, Expected: {$expectedAutoROCount}, Existing: {$existingAutoROCountAfterLock})");
+                        
                         return true;
                     } else {
                         // Auto RO sudah dibuat oleh proses lain, skip
