@@ -102,4 +102,48 @@ class AdminGlobalProfitSharingController extends Controller
             'dates'
         ));
     }
+    
+    /**
+     * Get GPS detail for a specific date
+     */
+    public function detail(Request $request)
+    {
+        $date = $request->date;
+        $month = $request->month;
+        
+        if (!$date) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tanggal tidak valid'
+            ], 400);
+        }
+        
+        // Ambil data GPS daily untuk tanggal tersebut
+        $gpsDailies = GlobalProfitSharingDaily::whereDate('date', $date)
+            ->with('user:id,username,name')
+            ->orderBy('amount', 'desc')
+            ->get();
+        
+        // Format data untuk response
+        $data = $gpsDailies->map(function($daily) {
+            return [
+                'username' => $daily->user->username,
+                'name' => $daily->user->name,
+                'amount' => $daily->amount,
+                'amount_formatted' => number_format($daily->amount, 0, ',', '.'),
+                'profile_url' => url('user/' . $daily->user->id . '/profile')
+            ];
+        });
+        
+        $total = $gpsDailies->sum('amount');
+        
+        return response()->json([
+            'success' => true,
+            'date' => $date,
+            'date_formatted' => Carbon::parse($date)->translatedFormat('d F Y'),
+            'data' => $data,
+            'total' => $total,
+            'total_formatted' => number_format($total, 0, ',', '.')
+        ]);
+    }
 }

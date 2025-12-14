@@ -803,18 +803,18 @@
                         <div class="card-body">
                             <h4 class="card-title">Historis Harian Global Profit Sharing <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
-                            <h6 class="card-subtitle">Riwayat Global Profit Sharing per member untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (klik untuk melihat breakdown per tanggal)</h6>
+                            <h6 class="card-subtitle">Riwayat Global Profit Sharing per tanggal untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}</h6>
                             <div class="table-responsive">
                                 <table id="admin-monthly-global-profit-sharing-daily"
                                     class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
                                     width="100%">
                                     <thead>
                                         <tr>
-                                            <th></th>
                                             <th>#</th>
-                                            <th>Username</th>
-                                            <th>Nama</th>
-                                            <th class="text-right">Total Global Profit Sharing (Rp)</th>
+                                            <th>Tanggal</th>
+                                            <th class="text-right">Total GPS Dibagikan (Rp)</th>
+                                            <th class="text-center">Jumlah Member</th>
+                                            <th class="text-center">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -823,53 +823,34 @@
                                             $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
                                             $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
                                             
-                                            // Ambil semua Platinum perdana aktif
-                                            $platinumUsers = \App\Models\User::whereHas('profitSharings', function ($q) {
-                                                $q->where('is_perdana_platinum', true);
-                                            })
-                                            ->whereHas('premiumUserPin', function ($q) {
-                                                $q->whereHas('pin', function ($qPin) {
-                                                    $qPin->where('name', 'Platinum')->where('type', 'premium');
-                                                });
-                                            })
-                                            ->where('is_active', true)
-                                            ->get();
+                                            // Ambil data GPS daily per tanggal
+                                            $gpsDailyByDate = \App\Models\GlobalProfitSharingDaily::whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                                                ->selectRaw('date, SUM(amount) as total_amount, COUNT(DISTINCT user_id) as member_count')
+                                                ->groupBy('date')
+                                                ->orderBy('date', 'desc')
+                                                ->get();
                                         @endphp
-                                        @foreach ($platinumUsers as $user)
-                                            @php
-                                                // Ambil GPS daily untuk bulan tersebut
-                                                $gpsDaily = $user->globalProfitSharingDailies()
-                                                    ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-                                                    ->orderBy('date', 'desc')
-                                                    ->get();
-                                                
-                                                $totalGps = $gpsDaily->sum('amount');
-                                                
-                                                // Simpan data GPS daily sebagai JSON untuk digunakan di JavaScript
-                                                $gpsDailyData = $gpsDaily->map(function($daily) {
-                                                    return [
-                                                        'date' => \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y'),
-                                                        'amount' => number_format($daily->amount, 0, ',', '.')
-                                                    ];
-                                                })->toJson();
-                                            @endphp
-                                            @if($totalGps > 0)
-                                                <tr data-user-id="{{ $user->id }}" data-gps-daily='{{ $gpsDailyData }}'>
-                                                    <td class="details-control" style="cursor: pointer; text-align: center;">
-                                                        <i class="mdi mdi-plus-circle text-primary"></i>
-                                                    </td>
-                                                    <td>{{ $counter++ }}</td>
-                                                    <td>
-                                                        <a href="{{ url('user/' . $user->id . '/profile') }}">
-                                                            {{ $user->username }}
-                                                        </a>
-                                                    </td>
-                                                    <td>{{ $user->name }}</td>
-                                                    <td class="text-right">
-                                                        <code>{{ number_format($totalGps, 0, ',', '.') }}</code>
-                                                    </td>
-                                                </tr>
-                                            @endif
+                                        @foreach ($gpsDailyByDate as $dateData)
+                                            <tr data-date="{{ $dateData->date }}">
+                                                <td>{{ $counter++ }}</td>
+                                                <td>
+                                                    <code>{{ \Carbon\Carbon::parse($dateData->date)->translatedFormat('d F Y') }}</code>
+                                                </td>
+                                                <td class="text-right">
+                                                    <code>{{ number_format($dateData->total_amount, 0, ',', '.') }}</code>
+                                                </td>
+                                                <td class="text-center">
+                                                    <code>{{ $dateData->member_count }}</code>
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-info btn-view-detail" 
+                                                            data-date="{{ $dateData->date }}"
+                                                            data-toggle="modal" 
+                                                            data-target="#gps-detail-modal">
+                                                        <i class="mdi mdi-eye"></i> Lihat Rincian
+                                                    </button>
+                                                </td>
+                                            </tr>
                                         @endforeach
                                     </tbody>
                                 </table>
@@ -1763,30 +1744,64 @@
                         'copy', 'csv', 'excel', 'pdf', 'print'
                     ],
                     order: [
-                        [4, "desc"]
+                        [1, "desc"]
                     ],
                     language: {
                         url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
                     },
                 });
                 
-                // Handle click pada tombol expand/collapse
-                $('#admin-monthly-global-profit-sharing-daily tbody').on('click', 'td.details-control', function () {
-                    var tr = $(this).closest('tr');
-                    var row = table.row(tr);
-                    var gpsDailyData = JSON.parse(tr.attr('data-gps-daily'));
+                // Handle click pada tombol "Lihat Rincian"
+                $('#admin-monthly-global-profit-sharing-daily tbody').on('click', 'button.btn-view-detail', function () {
+                    var date = $(this).data('date');
+                    var modal = $('#gps-detail-modal');
+                    var modalBody = modal.find('.modal-body');
                     
-                    if (row.child.isShown()) {
-                        // Tutup row
-                        row.child.hide();
-                        tr.removeClass('shown');
-                        $(this).find('i').removeClass('mdi-minus-circle').addClass('mdi-plus-circle');
-                    } else {
-                        // Buka row
-                        row.child(format(gpsDailyData)).show();
-                        tr.addClass('shown');
-                        $(this).find('i').removeClass('mdi-plus-circle').addClass('mdi-minus-circle');
-                    }
+                    // Tampilkan loading
+                    modalBody.html('<div class="text-center"><i class="mdi mdi-loading mdi-spin" style="font-size: 2em;"></i><p>Memuat data...</p></div>');
+                    
+                    // Load data via AJAX
+                    $.ajax({
+                        url: '{{ route("admin-global-profit-sharing.detail") }}',
+                        method: 'GET',
+                        data: {
+                            date: date,
+                            month: '{{ $month }}'
+                        },
+                        success: function(response) {
+                            if (response.success && response.data) {
+                                var html = '<h5 class="mb-3">Detail Global Profit Sharing - ' + response.date_formatted + '</h5>';
+                                html += '<div class="table-responsive">';
+                                html += '<table class="table table-hover table-striped table-bordered">';
+                                html += '<thead><tr><th>#</th><th>Username</th><th class="text-right">Nominal (Rp)</th></tr></thead>';
+                                html += '<tbody>';
+                                
+                                if (response.data.length > 0) {
+                                    response.data.forEach(function(item, index) {
+                                        html += '<tr>';
+                                        html += '<td>' + (index + 1) + '</td>';
+                                        html += '<td><a href="' + item.profile_url + '">' + item.username + '</a></td>';
+                                        html += '<td class="text-right"><code>' + item.amount_formatted + '</code></td>';
+                                        html += '</tr>';
+                                    });
+                                } else {
+                                    html += '<tr><td colspan="3" class="text-center">Tidak ada data</td></tr>';
+                                }
+                                
+                                html += '</tbody>';
+                                html += '<tfoot><tr><th colspan="2" class="text-right">Total:</th><th class="text-right"><code>' + response.total_formatted + '</code></th></tr></tfoot>';
+                                html += '</table>';
+                                html += '</div>';
+                                
+                                modalBody.html(html);
+                            } else {
+                                modalBody.html('<div class="alert alert-danger">Gagal memuat data</div>');
+                            }
+                        },
+                        error: function() {
+                            modalBody.html('<div class="alert alert-danger">Terjadi kesalahan saat memuat data</div>');
+                        }
+                    });
                 });
             });
         </script>
@@ -2005,6 +2020,26 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Detail Omset Grup</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Content akan diisi via JavaScript -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal untuk detail GPS per tanggal -->
+    <div class="modal fade" id="gps-detail-modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rincian Global Profit Sharing</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
