@@ -311,6 +311,7 @@ class User extends Authenticatable
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
             $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
             $q->orWhere('type', 'Bonus Profit Sharing');
+            $q->orWhere('type', 'Bonus Global Profit Sharing');
             $q->orWhere('type', 'Bonus Power Plus');
         })->whereNull('paid_at');
     }

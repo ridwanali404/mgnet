@@ -680,7 +680,10 @@
                     </div>
                     @foreach ($users as $a)
                         @if ($a->monthlyQualified($month))
-                            @if (!$a->monthlyBonuses($month)->first()->paid_at)
+                            @php
+                                $userMonthlyBonus = $a->monthlyBonuses($month)->first();
+                            @endphp
+                            @if (!$userMonthlyBonus || !$userMonthlyBonus->paid_at)
                                 <div class="modal inmodal" id="confirm{{ $a->id }}" tabindex="-1"
                                     role="dialog" aria-hidden="true">
                                     <div class="modal-dialog">
