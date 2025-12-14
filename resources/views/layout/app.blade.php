@@ -266,6 +266,10 @@
                                 <a href="{{ route('report-omset.index') }}" aria-expanded="false"><i
                                         class="mdi mdi-chart-line"></i><span class="hide-menu">Report Omset</span></a>
                             </li>
+                            <li class="{{ request()->segment(1) == 'admin-global-profit-sharing' ? 'active' : '' }}">
+                                <a href="{{ route('admin-global-profit-sharing.index') }}" aria-expanded="false"><i
+                                        class="mdi mdi-chart-bar"></i><span class="hide-menu">Global Profit Sharing</span></a>
+                            </li>
                         @endif
                         @if (auth()->user()->type == 'admin' || (auth()->user()->type == 'member' && auth()->user()->userPin?->level >= 3))
                             <li class="{{ Route::is('userAward.index') ? 'active' : '' }}">

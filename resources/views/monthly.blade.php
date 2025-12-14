@@ -508,7 +508,7 @@
                                     <h4 class="card-title">Bonus Bulanan</h4>
                                     @if (!$closing)
                                         <h6 class="card-subtitle">
-                                            Bonus Unilevel RO dan Royalti Profit Sharing akan diakumulasi setelah closing
+                                            Bonus Global Profit Sharing dan Power Plus akan diakumulasi setelah closing
                                             {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}
                                         </h6>
                                     @endif

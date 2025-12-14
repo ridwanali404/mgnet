@@ -197,6 +197,8 @@ Route::group(['middleware' => ['auth']], function () {
         Route::get('stockist-area', 'UserController@stockistArea')->name('stockist.area');
         Route::get('admin', 'UserController@admin');
         Route::post('admin', 'UserController@adminStore')->name('admin.store');
+        Route::get('report-omset', 'ReportOmsetController@index')->name('report-omset.index');
+        Route::get('admin-global-profit-sharing', 'AdminGlobalProfitSharingController@index')->name('admin-global-profit-sharing.index');
         Route::put('admin/{user}', 'UserController@adminUpdate')->name('admin.update');
         Route::delete('admin/{user}', 'UserController@adminDestroy')->name('admin.destroy');
         Route::view('config/daily', 'config.daily')->name('config.daily');
