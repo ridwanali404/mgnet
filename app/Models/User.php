@@ -318,6 +318,7 @@ class User extends Authenticatable
         })->whereNull('paid_at');
     }
 
+
     public function monthlyCashbackBonuses($month)
     {
         return $this->bonuses()->whereYear('created_at', date('Y', strtotime($month)))->whereMonth('created_at', date('m', strtotime($month)))->where(function ($q) {

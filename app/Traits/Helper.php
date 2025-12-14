@@ -1151,33 +1151,17 @@ trait Helper
 
     /**
      * Payout Profit Sharing bulanan
-     * Dipanggil setiap bulan untuk membayar profit sharing
+     * DEPRECATED: Fungsi ini sudah tidak digunakan lagi
+     * Diganti dengan payoutGlobalProfitSharing() untuk GPS
+     * 
+     * @deprecated Gunakan payoutGlobalProfitSharing() sebagai gantinya
      */
     public static function payoutProfitSharing($month)
     {
-        $date = DateTime::createFromFormat('Y-m', $month);
-        $users = User::whereHas('profitSharings', function ($q) {
-            $q->where('is_perdana_platinum', true);
-        })->where('is_active', true)->get();
-        
-        foreach ($users as $user) {
-            $profitSharing = $user->profitSharings()->where('is_perdana_platinum', true)->first();
-            if ($profitSharing && $profitSharing->wallet_cashback > 0) {
-                $user->bonuses()->create([
-                    'type' => 'Bonus Profit Sharing',
-                    'amount' => $profitSharing->wallet_cashback,
-                    'description' => 'Bonus Profit Sharing 5% untuk bulan ' . $month . '.',
-                    'created_at' => $month . '-01 00:00:00',
-                    'updated_at' => $month . '-01 00:00:00',
-                ]);
-                
-                // Reset wallet cashback setelah payout
-                $profitSharing->update([
-                    'wallet_cashback' => 0,
-                    'monthly_total' => $profitSharing->wallet_cashback,
-                ]);
-            }
-        }
+        // Fungsi ini sudah tidak digunakan lagi
+        // Bonus Profit Sharing lama sudah diganti dengan Bonus Global Profit Sharing
+        // Tidak membuat bonus lagi untuk menghindari duplikasi
+        return;
     }
 
     /**

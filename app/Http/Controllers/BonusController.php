@@ -266,7 +266,8 @@ class BonusController extends Controller
                                 $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
                                 $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
                                 $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
-                                $q->orWhere('type', 'Bonus Profit Sharing');
+                                // Bonus Profit Sharing lama sudah dihapus, diganti dengan Bonus Global Profit Sharing
+                                // $q->orWhere('type', 'Bonus Profit Sharing');
                                 $q->orWhere('type', 'Bonus Global Profit Sharing');
                                 $q->orWhere('type', 'Bonus Power Plus');
                             });
