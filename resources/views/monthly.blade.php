@@ -866,24 +866,59 @@
                             @endif
                         @endif
                     @endforeach
+                    @php
+                        // Hitung total bonus bulanan
+                        $totalBonusHarusDibayar = 0;
+                        $totalBonusSudahDibayar = 0;
+                        
+                        foreach ($users as $a) {
+                            $monthly_bonuses = $a->monthlyBonuses($month)->sum('amount');
+                            $monthly_qualified = $a->monthlyQualified($month);
+                            $monthly_bonus = $a->monthlyBonuses($month)->first();
+                            $monthly_total = $monthly_bonuses - ($monthly_bonuses > $monthly_admin_fee ? $monthly_admin_fee : 0) - ($monthly_bonuses > 330000 ? ($a->npwp ? ($monthly_bonuses * 5) / 100 : ($monthly_bonuses * 6) / 100) : 0);
+                            
+                            if ($monthly_qualified) {
+                                if ($monthly_bonus && $monthly_bonus->paid_at) {
+                                    // Sudah dibayar
+                                    $totalBonusSudahDibayar += $monthly_total;
+                                } elseif ($monthly_total >= 50000) {
+                                    // Harus dibayar
+                                    $totalBonusHarusDibayar += $monthly_total;
+                                }
+                            }
+                        }
+                    @endphp
                     <div class="card">
                         <div class="card-body">
-                            <h4 class="card-title">Member Qualified Bonus Generasi</h4>
-                            <h6 class="card-subtitle">Member yang memenuhi syarat untuk mendapatkan Bonus Generasi</h6>
-                            <div class="table-responsive">
-                                <table id="qualified"
-                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
-                                    width="100%">
-                                    <thead>
-                                        <tr>
-                                            <th data-orderable="false">#</th>
-                                            <th>Username</th>
-                                            <th>Nama</th>
-                                            <th class="text-right">Poin</th>
-                                            <th class="text-right">Bonus (Rp)</th>
-                                        </tr>
-                                    </thead>
-                                </table>
+                            <h4 class="card-title">Total Bonus Bulan ini</h4>
+                            <h6 class="card-subtitle">Ringkasan total bonus bulanan untuk {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }}</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card bg-warning text-white">
+                                        <div class="card-body">
+                                            <h5 class="card-title text-white">Harus Dibayar</h5>
+                                            <h2 class="text-white mb-0">
+                                                <code class="text-white" style="font-size: 1.5em;">
+                                                    Rp {{ number_format($totalBonusHarusDibayar, 0, ',', '.') }}
+                                                </code>
+                                            </h2>
+                                            <small>Total bonus yang harus dibayarkan bulan ini</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card bg-primary text-white">
+                                        <div class="card-body">
+                                            <h5 class="card-title text-white">Sudah Dibayar</h5>
+                                            <h2 class="text-white mb-0">
+                                                <code class="text-white" style="font-size: 1.5em;">
+                                                    Rp {{ number_format($totalBonusSudahDibayar, 0, ',', '.') }}
+                                                </code>
+                                            </h2>
+                                            <small>Total bonus yang sudah dibayarkan</small>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1832,53 +1867,6 @@
                         updateCheckAllState();
                     }
                 });
-                var qualified = $('#qualified').DataTable({
-                    dom: 'Bfrtip',
-                    buttons: [
-                        'copy', 'csv', 'excel', 'pdf', 'print'
-                    ],
-                    order: [
-                        [1, "asc"]
-                    ],
-                    language: {
-                        url: "https://cdn.datatables.net/plug-ins/1.10.20/i18n/Indonesian.json"
-                    },
-                    "bProcessing": true,
-                    "sAjaxSource": "/qualified?month={{ $month }}",
-                    "aoColumns": [{
-                            "mDataProp": null
-                        },
-                        {
-                            "mDataProp": "username"
-                        },
-                        {
-                            "mDataProp": "name"
-                        },
-                        {
-                            "mDataProp": "poin",
-                            "mRender": function(data) {
-                                return '<code>' + data.toLocaleString('id') + '</code>';
-                            },
-                            "sClass": "text-right",
-                        },
-                        {
-                            "mDataProp": "bonus",
-                            "mRender": function(data) {
-                                return '<code>' + data.toLocaleString('id') + '</code>';
-                            },
-                            "sClass": "text-right",
-                            "bVisible": {{ $closing ? 'true' : 'false' }},
-                        },
-                    ]
-                });
-                qualified.on('order.dt search.dt', function() {
-                    qualified.column(0, {
-                        search: 'applied',
-                        order: 'applied'
-                    }).nodes().each(function(cell, i) {
-                        cell.innerHTML = i + 1;
-                    });
-                }).draw();
                 $('#admin-monthly-power-plus').DataTable({
                     dom: 'Bfrtip',
                     buttons: [
