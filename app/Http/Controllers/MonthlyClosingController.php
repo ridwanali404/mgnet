@@ -17,6 +17,7 @@ use App\Models\DailyPoin;
 use App\Models\ProfitSharing;
 use App\Models\PowerPlusQualification;
 use App\Models\GlobalProfitSharingSaving;
+use Illuminate\Support\Facades\Log;
 
 class MonthlyClosingController extends Controller
 {
@@ -165,6 +166,19 @@ class MonthlyClosingController extends Controller
             if ($user->active_until) {
                 Helper::extendActiveStatus($user, 'ro_qualified');
             }
+        }
+
+        // Reset omset per leg untuk bulan berikutnya (Current Month Turnover di-reset)
+        // Setelah closing bulanan, omset per leg untuk bulan berikutnya mulai dari 0
+        $nextMonth = Carbon::createFromFormat('Y-m', $month)->addMonth()->format('Y-m');
+        $nextMonthEndDate = Carbon::createFromFormat('Y-m', $nextMonth)->endOfMonth()->format('Y-m-d');
+        
+        // Hapus PowerPlusQualification untuk bulan berikutnya (jika sudah dibuat)
+        // Ini memastikan omset per leg untuk bulan berikutnya mulai dari 0
+        $deletedNextMonthQualifications = PowerPlusQualification::where('date', $nextMonthEndDate)->delete();
+        
+        if ($deletedNextMonthQualifications > 0) {
+            Log::info("Reset PowerPlusQualification untuk bulan berikutnya ({$nextMonth}): {$deletedNextMonthQualifications} records dihapus");
         }
 
         // create closing
@@ -373,8 +387,23 @@ class MonthlyClosingController extends Controller
             
             // Reset bonus_amount di PowerPlusQualification untuk bulan tersebut
             $endDate = $date->format('Y-m-t');
-            \App\Models\PowerPlusQualification::where('date', $endDate)
+            PowerPlusQualification::where('date', $endDate)
                 ->update(['bonus_amount' => 0]);
+            
+            // Restore PowerPlusQualification untuk bulan berikutnya (jika sudah dihapus saat closing)
+            // Setelah batal closing, omset per leg untuk bulan berikutnya perlu dihitung ulang
+            $nextMonth = Carbon::createFromFormat('Y-m', $month)->addMonth()->format('Y-m');
+            $nextMonthEndDate = Carbon::createFromFormat('Y-m', $nextMonth)->endOfMonth()->format('Y-m-d');
+            
+            // Recalculate Power Plus untuk bulan berikutnya (jika sudah ada transaksi)
+            // Setelah batal closing, omset per leg untuk bulan berikutnya perlu dihitung ulang
+            // karena sebelumnya sudah di-reset saat closing
+            try {
+                Helper::calculatePowerPlus($nextMonth);
+                Log::info("Recalculate PowerPlusQualification untuk bulan berikutnya ({$nextMonth}) setelah batal closing");
+            } catch (\Exception $e) {
+                Log::warning("Gagal recalculate PowerPlus untuk bulan berikutnya setelah batal closing: " . $e->getMessage());
+            }
 
             // 5. Hapus bonus Global Profit Sharing yang dibuat saat closing (jika ada)
             // Tapi JANGAN hapus GPS daily karena generate per hari

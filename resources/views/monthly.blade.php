@@ -567,23 +567,43 @@
                                         @foreach ($users as $a)
                                             @php
                                                 $monthly_cashback_bonuses = $a->monthlyCashbackBonuses($month)->sum('amount');
-                                                // Ambil bonus Profit Sharing lama + bonus Global Profit Sharing (GPS)
-                                                $monthly_profit_sharing_bonuses = $a->monthlyProfitSharingBonuses($month)->sum('amount');
+                                                
+                                                // Ambil bonus Global Profit Sharing (GPS)
+                                                // Cek apakah ada bonus Global Profit Sharing (setelah closing)
                                                 $monthly_gps_bonuses = $a->bonuses()
                                                     ->whereYear('created_at', date('Y', strtotime($month)))
                                                     ->whereMonth('created_at', date('m', strtotime($month)))
                                                     ->where('type', 'Bonus Global Profit Sharing')
                                                     ->sum('amount');
-                                                // Jika belum ada bonus GPS (belum closing), ambil dari GPS saving wallet_cashback
+                                                
+                                                // Jika belum ada bonus GPS (belum closing), ambil dari GPS daily untuk bulan tersebut
                                                 if ($monthly_gps_bonuses == 0) {
+                                                    $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+                                                    $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+                                                    
+                                                    // Hitung total GPS daily untuk bulan tersebut
+                                                    $gpsDailyTotal = $a->globalProfitSharingDailies()
+                                                        ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                                                        ->sum('amount');
+                                                    
+                                                    // Ambil wallet_cashback dari GPS saving
+                                                    // Tapi untuk display, gunakan min antara wallet_cashback dan gpsDailyTotal
+                                                    // Karena wallet_cashback bisa berisi akumulasi dari bulan lain
                                                     $gpsSaving = $a->globalProfitSharingSavings()->first();
-                                                    $monthly_gps_bonuses = $gpsSaving ? $gpsSaving->wallet_cashback : 0;
+                                                    if ($gpsSaving && $gpsSaving->wallet_cashback > 0) {
+                                                        // Pastikan tidak melebihi GPS daily untuk bulan tersebut
+                                                        $monthly_gps_bonuses = min($gpsDailyTotal, $gpsSaving->wallet_cashback);
+                                                    } else {
+                                                        $monthly_gps_bonuses = $gpsDailyTotal;
+                                                    }
                                                 }
-                                                // Total Global Profit Sharing = Profit Sharing lama + GPS
-                                                $monthly_profit_sharing_bonuses = $monthly_profit_sharing_bonuses + $monthly_gps_bonuses;
+                                                
+                                                // Bonus Profit Sharing lama sudah dihapus, tidak digunakan lagi
+                                                // Hanya menggunakan Bonus Global Profit Sharing (GPS)
+                                                
                                                 $monthly_power_plus_bonuses = $a->monthlyPowerPlusBonuses($month)->sum('amount');
                                                 $monthly_bonus = $a->monthlyBonuses($month)->first();
-                                                // monthlyBonuses sudah include GPS bonus sekarang
+                                                // monthlyBonuses sudah tidak include Bonus Profit Sharing lama, hanya GPS
                                                 $monthly_bonuses = $a->monthlyBonuses($month)->sum('amount');
                                                 $monthly_qualified = $a->monthlyQualified($month);
                                                 $monthly_total = $monthly_bonuses - ($monthly_bonuses > $monthly_admin_fee ? $monthly_admin_fee : 0) - ($monthly_bonuses > 330000 ? ($a->npwp ? ($monthly_bonuses * 5) / 100 : ($monthly_bonuses * 6) / 100) : 0);
@@ -629,7 +649,7 @@
                                                     <code>{{ number_format($monthly_cashback_bonuses, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-right">
-                                                    <code>{{ number_format($monthly_profit_sharing_bonuses, 0, ',', '.') }}</code>
+                                                    <code>{{ number_format($monthly_gps_bonuses, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-right">
                                                     <code>{{ number_format($monthly_power_plus_bonuses, 0, ',', '.') }}</code>
