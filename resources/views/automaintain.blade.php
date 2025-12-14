@@ -402,6 +402,74 @@
                 </div>
             </div>
         </div>
+        @if (auth()->user()->type == 'admin' && $membersWithAutomaintain->count() > 0)
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Daftar Member dengan Saldo Automaintain</h3>
+                    <div class="table-responsive">
+                        <table id="members-automaintain-table" class="display nowrap table table-hover table-striped table-bordered"
+                            cellspacing="0" width="100%">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Username</th>
+                                    <th class="text-right">Saldo Automaintain (Rp)</th>
+                                    <th>Tanggal Terakhir Update</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($membersWithAutomaintain as $key => $member)
+                                    <tr>
+                                        <td>{{ $key + 1 }}</td>
+                                        <td>
+                                            <a href="{{ url('user/' . $member->id . '/profile') }}">{{ $member->username }}</a>
+                                        </td>
+                                        <td class="text-right">
+                                            <code>{{ number_format($member->cash_automaintain, 0, ',', '.') }}</code>
+                                        </td>
+                                        <td>
+                                            <code>{{ $member->last_automaintain_update ? $member->last_automaintain_update->format('Y-m-d H:i:s') : '-' }}</code>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+        @if (auth()->user()->type == 'admin' && $membersAlreadyAutomaintain->count() > 0)
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Daftar Member yang Sudah Automaintain</h3>
+                    <div class="table-responsive">
+                        <table id="members-already-automaintain-table" class="display nowrap table table-hover table-striped table-bordered"
+                            cellspacing="0" width="100%">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Username</th>
+                                    <th>Tanggal Automaintain</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($membersAlreadyAutomaintain as $key => $member)
+                                    <tr>
+                                        <td>{{ $key + 1 }}</td>
+                                        <td>
+                                            <a href="{{ url('user/' . $member->id . '/profile') }}">{{ $member->username }}</a>
+                                        </td>
+                                        <td>
+                                            <code>{{ $member->last_automaintain_date ? $member->last_automaintain_date->format('Y-m-d H:i:s') : '-' }}</code>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
     @foreach ($topups as $a)
         @if ($a->receipt)
@@ -453,6 +521,30 @@
                     'copy', 'csv', 'excel', 'pdf', 'print'
                 ]
             });
+            @if (auth()->user()->type == 'admin' && $membersWithAutomaintain->count() > 0)
+            $('#members-automaintain-table').DataTable({
+                "language": {
+                    "url": "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Indonesian.json"
+                },
+                dom: 'Bfrtip',
+                buttons: [
+                    'copy', 'csv', 'excel', 'pdf', 'print'
+                ],
+                "order": [[ 0, "asc" ]]
+            });
+            @endif
+            @if (auth()->user()->type == 'admin' && $membersAlreadyAutomaintain->count() > 0)
+            $('#members-already-automaintain-table').DataTable({
+                "language": {
+                    "url": "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Indonesian.json"
+                },
+                dom: 'Bfrtip',
+                buttons: [
+                    'copy', 'csv', 'excel', 'pdf', 'print'
+                ],
+                "order": [[ 2, "desc" ]]
+            });
+            @endif
         });
     </script>
 @endsection
