@@ -107,6 +107,38 @@
                 </div>
                 <div class="hr-line-dashed"></div>
                 <div class="form-group">
+                    <label class="col-sm-2 control-label">Gambar Coming Soon</label>
+                    <div class="col-sm-10">
+                        @php
+                            $comingSoonImage = \App\Models\KeyValue::where('key', 'coming_soon_image')->value('value');
+                        @endphp
+                        @if($comingSoonImage)
+                            <div class="mb-3">
+                                <img src="{{ asset('storage/' . $comingSoonImage) }}" alt="Coming Soon Image" 
+                                     style="max-width: 300px; max-height: 300px; margin-bottom: 10px;" class="img-thumbnail">
+                                <br>
+                                <small class="text-muted">Gambar saat ini</small>
+                            </div>
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" name="delete_coming_soon_image" value="1">
+                                    Hapus gambar Coming Soon
+                                </label>
+                            </div>
+                            <div class="hr-line-dashed"></div>
+                        @endif
+                        <input type="file" name="coming_soon_image" accept="image/*" class="form-control">
+                        <small class="help-block m-t-xs">
+                            Upload gambar untuk footer Coming Soon. Jika tidak diisi, tidak akan ada gambar yang ditampilkan.
+                            <br>
+                            <a href="{{ asset('images/hand_cr.png') }}" download="coming-soon-default.png" class="text-primary">
+                                <i class="fa fa-download"></i> Download gambar default Coming Soon
+                            </a>
+                        </small>
+                    </div>
+                </div>
+                <div class="hr-line-dashed"></div>
+                <div class="form-group">
                     <div class="col-sm-4 col-sm-offset-2">
                         <button class="btn btn-primary" type="submit" name="update">Save changes</button>
                     </div>

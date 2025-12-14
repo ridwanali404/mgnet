@@ -448,7 +448,7 @@
                     <div class="container">
                         <div class="row">
                             <div class="col-md-6 offset-1 bottommargin-lg d-flex flex-column align-self-center">
-                                <h3 class="card-title fw-normal ls0">Coming Soon.<br>BSM Apps on Android PlayStore.
+                                <h3 class="card-title fw-normal ls0">Coming Soon.<br>MGNet Apps on Android PlayStore.
                                 </h3>
                                 @if (false)
                                     <span>Proactively enable Corporate Benefits.</span>
@@ -467,7 +467,12 @@
                                 @endif
                             </div>
                             <div class="col-md-4 d-none d-md-flex align-items-end">
-                                <img src="{{ asset('images/hand_cr.png') }}" alt="Image" class="mb-0">
+                                @php
+                                    $comingSoonImage = \App\Models\KeyValue::where('key', 'coming_soon_image')->value('value');
+                                @endphp
+                                @if($comingSoonImage)
+                                    <img src="{{ asset('storage/' . $comingSoonImage) }}" alt="Coming Soon" class="mb-0">
+                                @endif
                             </div>
                         </div>
                     </div>
