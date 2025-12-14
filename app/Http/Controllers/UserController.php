@@ -384,7 +384,7 @@ class UserController extends Controller
 
     public function filter()
     {
-        $query = User::select('id', 'username as text')->where('type', 'member');
+        $query = User::select('id', 'username as text')->whereIn('type', ['member', 'admin']);
         
         // Jika ada sponsor_id, hanya tampilkan downline dari sponsor tersebut (Tree Sponsor)
         if (request()->has('sponsor_id') && request()->get('sponsor_id')) {
