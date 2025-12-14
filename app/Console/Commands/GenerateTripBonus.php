@@ -114,8 +114,8 @@ class GenerateTripBonus extends Command
                 $this->info("Akan generate: " . count($datesToGenerate) . " hari dari {$startDateReadable} sampai {$targetDateReadable}");
             } else {
                 // Jika tidak ada UserPin atau startDate > targetDate, generate target date saja
-                $datesToGenerate = [$targetDateFormatted];
-                $this->info("Belum ada data sebelumnya. Akan generate untuk: {$targetDateReadable}");
+            $datesToGenerate = [$targetDateFormatted];
+            $this->info("Belum ada data sebelumnya. Akan generate untuk: {$targetDateReadable}");
             }
         }
         

@@ -900,8 +900,22 @@
                                     </div>
                                 </td>
                                 <td class="text-right">
+                                    @php
+                                        // Cek apakah ada bonus Global Profit Sharing (setelah closing)
+                                        $gpsBonusTotal = Auth::user()->bonuses()
+                                            ->whereYear('created_at', date('Y', strtotime($month)))
+                                            ->whereMonth('created_at', date('m', strtotime($month)))
+                                            ->where('type', 'Bonus Global Profit Sharing')
+                                            ->sum('amount');
+                                        
+                                        // Jika belum ada bonus, ambil dari GPS saving wallet_cashback
+                                        if ($gpsBonusTotal == 0) {
+                                            $gpsSaving = Auth::user()->globalProfitSharingSavings()->first();
+                                            $gpsBonusTotal = $gpsSaving ? $gpsSaving->wallet_cashback : 0;
+                                        }
+                                    @endphp
                                     <code id="profit-sharing">
-                                        {{ number_format(Auth::user()->monthlyProfitSharingBonuses($month)->sum('amount'),0,',','.') }}
+                                        {{ number_format($gpsBonusTotal,0,',','.') }}
                                     </code>
                                 </td>
                             </tr>
@@ -1091,6 +1105,32 @@
                             <h4 class="card-title">Bonus Total Global Profit Sharing <span
                                     class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
                             <h6 class="card-subtitle">Total bonus profit sharing untuk Platinum</h6>
+                            @php
+                                // Ambil bonus Global Profit Sharing yang sudah dibuat (setelah closing)
+                                $gpsBonuses = Auth::user()->bonuses()
+                                    ->whereYear('created_at', date('Y', strtotime($month)))
+                                    ->whereMonth('created_at', date('m', strtotime($month)))
+                                    ->where('type', 'Bonus Global Profit Sharing')
+                                    ->latest()
+                                    ->get();
+                                
+                                // Jika belum ada bonus (belum closing), ambil dari GPS daily untuk bulan tersebut
+                                if ($gpsBonuses->count() == 0) {
+                                    $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+                                    $endDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->endOfMonth();
+                                    $gpsDaily = Auth::user()->globalProfitSharingDailies()
+                                        ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                                        ->orderBy('date', 'desc')
+                                        ->get();
+                                    
+                                    // Jika ada GPS saving, tampilkan wallet cashback sebagai potensi
+                                    $gpsSaving = Auth::user()->globalProfitSharingSavings()->first();
+                                    $totalGpsPotential = $gpsSaving ? $gpsSaving->wallet_cashback : $gpsDaily->sum('amount');
+                                } else {
+                                    $gpsDaily = collect();
+                                    $totalGpsPotential = 0;
+                                }
+                            @endphp
                             <div class="table-responsive">
                                 <table id="monthly-profit-sharing"
                                     class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
@@ -1104,76 +1144,40 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (Auth::user()->monthlyProfitSharingBonuses($month)->latest()->get() as $a)
-                                            <tr>
-                                                <td>{{ $loop->index + 1 }}</td>
-                                                <td><code>{{ $a->created_at }}</code></td>
-                                                <td class="text-right">
-                                                    <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
-                                                </td>
-                                                <td>{{ $a->description }}</td>
-                                            </tr>
-                                        @endforeach
+                                        @if($gpsBonuses->count() > 0)
+                                            {{-- Tampilkan bonus yang sudah dibuat (setelah closing) --}}
+                                            @foreach ($gpsBonuses as $a)
+                                                <tr>
+                                                    <td>{{ $loop->index + 1 }}</td>
+                                                    <td><code>{{ $a->created_at->format('Y-m-d') }}</code></td>
+                                                    <td class="text-right">
+                                                        <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
+                                                    </td>
+                                                    <td>{{ $a->description }}</td>
+                                                </tr>
+                                            @endforeach
+                                        @elseif($gpsDaily->count() > 0)
+                                            {{-- Tampilkan GPS daily sebagai potensi (belum closing) --}}
+                                            @foreach ($gpsDaily as $daily)
+                                                <tr>
+                                                    <td>{{ $loop->index + 1 }}</td>
+                                                    <td><code>{{ \Carbon\Carbon::parse($daily->date)->format('Y-m-d') }}</code></td>
+                                                    <td class="text-right">
+                                                        <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
+                                                    </td>
+                                                    <td>Global Profit Sharing harian</td>
+                                                </tr>
+                                            @endforeach
+                                        @endif
                                     </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-body">
-                            <h4 class="card-title">Historis Harian Profit Sharing <span
-                                    class="text-danger">{{ !$closing ? '(Potensi)' : '' }}</span></h4>
-                            <h6 class="card-subtitle">Riwayat profit sharing per hari untuk bulan {{ \Carbon\Carbon::createFromFormat('Y-m', $month)->translatedFormat('F Y') }} (batas jam 23:59 WIB auto-counting)</h6>
-                            @php
-                                $dailyProfitSharingHistory = Auth::user()->dailyProfitSharingHistory($month)->get();
-                                $totalDailyProfitSharing = $dailyProfitSharingHistory->sum('amount');
-                            @endphp
-                            {{-- Card Summary Global Profit Sharing --}}
-                            <div class="card table-responsive mt-3 mb-3">
-                                <table class="table table-hover table-stripped m-0">
-                                    <thead>
-                                        <tr style="line-height: 1.3;">
-                                            <th class="text-center">Global Profit Sharing<br><small class="text-muted">Total nominal profit sharing bulan ini</small></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td class="text-center">
-                                                <code class="font-weight-bold" style="font-size: 1.2em;">Rp {{ number_format($totalDailyProfitSharing, 0, ',', '.') }}</code>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="table-responsive">
-                                <table id="monthly-profit-sharing-daily"
-                                    class="display nowrap table table-hover table-striped table-bordered" cellspacing="0"
-                                    width="100%">
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Tanggal</th>
-                                            <th class="text-right">Profit Sharing (Rp)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($dailyProfitSharingHistory as $daily)
-                                            <tr>
-                                                <td>{{ $loop->index + 1 }}</td>
-                                                <td><code>{{ \Carbon\Carbon::parse($daily->date)->translatedFormat('d F Y') }}</code></td>
-                                                <td class="text-right">
-                                                    <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                    @if($totalDailyProfitSharing > 0)
+                                    @if($totalGpsPotential > 0 && $gpsBonuses->count() == 0)
                                     <tfoot>
                                         <tr>
-                                            <th colspan="2" class="text-right">Total:</th>
+                                            <th colspan="2" class="text-right">Total Potensi:</th>
                                             <th class="text-right">
-                                                <code>Rp {{ number_format($totalDailyProfitSharing, 0, ',', '.') }}</code>
+                                                <code>Rp {{ number_format($totalGpsPotential, 0, ',', '.') }}</code>
                                             </th>
+                                            <th></th>
                                         </tr>
                                     </tfoot>
                                     @endif

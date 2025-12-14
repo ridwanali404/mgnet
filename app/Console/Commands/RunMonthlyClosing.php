@@ -74,6 +74,16 @@ class RunMonthlyClosing extends Command
             $this->error("Error pada Power Plus calculation: " . $e->getMessage());
         }
 
+        // Run Global Profit Sharing (GPS) payout bulanan
+        // Menyatukan hasil total harian akumulasi GPS & hasil Powerleg ke bonus bulanan
+        $this->info("Menjalankan payout Global Profit Sharing (GPS)...");
+        try {
+            Helper::payoutGlobalProfitSharing($month);
+            $this->info("✓ Global Profit Sharing (GPS) payout berhasil");
+        } catch (\Exception $e) {
+            $this->error("Error pada GPS payout: " . $e->getMessage());
+        }
+
         // Summary
         $this->newLine();
         $this->info("==========================================");

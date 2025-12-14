@@ -249,6 +249,16 @@ class User extends Authenticatable
         return $this->hasMany(UmrohTripSaving::class);
     }
 
+    public function globalProfitSharingDailies()
+    {
+        return $this->hasMany(GlobalProfitSharingDaily::class);
+    }
+
+    public function globalProfitSharingSavings()
+    {
+        return $this->hasMany(GlobalProfitSharingSaving::class);
+    }
+
     public function userTripRewards()
     {
         return $this->hasMany(UserTripReward::class);

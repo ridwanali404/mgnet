@@ -52,6 +52,14 @@ class Kernel extends ConsoleKernel
             Log::info('Umroh Trip calculated: ' . date('Y-m-d'));
         })->dailyAt('23:45');
 
+        // Bonus harian - Global Profit Sharing (GPS) untuk seluruh Platinum aktif
+        $schedule->call(function () {
+            ini_set('max_execution_time', '-1');
+            ini_set('memory_limit', '-1');
+            Helper::calculateGlobalProfitSharing(date('Y-m-d'));
+            Log::info('Global Profit Sharing calculated: ' . date('Y-m-d'));
+        })->dailyAt('23:50');
+
         // Backups (to Google Drive)
         $schedule->command('backup:clean')->dailyAt('01:30');
         $schedule->command('backup:run --only-to-disk=google')->dailyAt('01:35');

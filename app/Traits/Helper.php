@@ -26,6 +26,8 @@ use App\Models\ProfitSharing;
 use App\Models\ProfitSharingDaily;
 use App\Models\UmrohTripSaving;
 use App\Models\UmrohTripDaily;
+use App\Models\GlobalProfitSharingDaily;
+use App\Models\GlobalProfitSharingSaving;
 use Illuminate\Support\Facades\Mail;
 
 trait Helper
@@ -1179,6 +1181,56 @@ trait Helper
     }
 
     /**
+     * Payout Global Profit Sharing (GPS) bulanan
+     * Menyatukan hasil total harian akumulasi GPS & hasil Powerleg ke bonus bulanan
+     * Dipanggil setiap bulan untuk membayar GPS
+     * Hanya untuk Platinum perdana aktif - GPS dan Power Plus digabungkan menjadi satu bonus
+     */
+    public static function payoutGlobalProfitSharing($month)
+    {
+        $date = DateTime::createFromFormat('Y-m', $month);
+        $startDate = $date->format('Y-m-01');
+        $endDate = $date->format('Y-m-t');
+        
+        // Dapatkan semua Platinum perdana aktif
+        $platinumUsers = User::whereHas('profitSharings', function ($q) {
+            $q->where('is_perdana_platinum', true);
+        })
+        ->whereHas('premiumUserPin', function ($q) {
+            $q->whereHas('pin', function ($qPin) {
+                $qPin->where('name', 'Platinum')->where('type', 'premium');
+            });
+        })
+        ->where('is_active', true)
+        ->get();
+        
+        foreach ($platinumUsers as $user) {
+            // Ambil saving record
+            $gpsSaving = GlobalProfitSharingSaving::where('user_id', $user->id)->first();
+            
+            // Buat bonus GPS terpisah jika ada wallet_cashback
+            if ($gpsSaving && $gpsSaving->wallet_cashback > 0) {
+                $user->bonuses()->create([
+                    'type' => 'Bonus Global Profit Sharing',
+                    'amount' => $gpsSaving->wallet_cashback,
+                    'description' => 'Global Profit Sharing 5% untuk bulan ' . $month . '.',
+                    'created_at' => $month . '-01 00:00:00',
+                    'updated_at' => $month . '-01 00:00:00',
+                ]);
+                
+                // Reset wallet cashback setelah payout
+                $gpsSaving->update([
+                    'wallet_cashback' => 0,
+                    'daily_accumulation' => 0,
+                ]);
+            }
+            
+            // Power Plus tetap dibuat terpisah (tidak dihapus atau digabung)
+            // Power Plus bonus sudah dibuat oleh calculatePowerPlus() sebelumnya
+        }
+    }
+
+    /**
      * Hitung Bonus Power Plus 8%
      * DIHITUNG BULANAN (bukan harian)
      * Dipanggil setiap bulan untuk menghitung bonus power plus berdasarkan omzet bulanan
@@ -1578,6 +1630,85 @@ trait Helper
             $newAccumulation = min($umrohSaving->yearly_accumulation + $umrohAmountPerMember, 50000000);
             $umrohSaving->update([
                 'yearly_accumulation' => $newAccumulation,
+            ]);
+        }
+    }
+
+    /**
+     * Hitung Global Profit Sharing (GPS) 5%
+     * DIHITUNG HARIAN untuk Platinum aktivasi perdana (first pin Platinum, bukan upgrade/RO/maintain)
+     * Dibagikan untuk semua Platinum perdana aktif setiap hari
+     * Dana dikumpulkan di wallet cashback, maksimal Rp 22.500.000 (tidak ada batas tahunan)
+     * Dipanggil setiap hari
+     */
+    public static function calculateGlobalProfitSharing($date = null)
+    {
+        if (!$date) {
+            $date = date('Y-m-d');
+        }
+        
+        // Hitung total omzet perusahaan hari ini menggunakan transactionPoinDaily
+        // Sama seperti perhitungan trip (4%), tapi untuk GPS 5%
+        $totalOmzet = Helper::transactionPoinDaily($date) * 1000; // Convert poin ke rupiah (1 poin = 1000)
+        $gpsPercent = 0.05; // 5% dari omzet
+        $totalGpsAmount = round($totalOmzet * $gpsPercent);
+        
+        // Dapatkan semua user Platinum yang aktivasi perdana (first pin Platinum, bukan upgrade/RO/maintain)
+        // Hanya Platinum yang JOIN dari awal (type = 'premium', bukan 'upgrade')
+        // Dan harus memiliki profit_sharings record dengan is_perdana_platinum = true
+        $platinumUsers = User::whereHas('profitSharings', function ($q) {
+            $q->where('is_perdana_platinum', true);
+        })
+        ->whereHas('premiumUserPin', function ($q) {
+            $q->whereHas('pin', function ($qPin) {
+                // Hanya Platinum yang JOIN dari awal (type = 'premium', bukan 'upgrade')
+                $qPin->where('name', 'Platinum')->where('type', 'premium');
+            });
+        })
+        ->where('is_active', true)
+        ->get();
+        
+        // Hitung jumlah per member: GPS Amount : Jumlah Platinum Perdana Aktif
+        $platinumCount = $platinumUsers->count();
+        if ($platinumCount > 0) {
+            $gpsAmountPerMember = round($totalGpsAmount / $platinumCount);
+        } else {
+            $gpsAmountPerMember = 0;
+        }
+        
+        foreach ($platinumUsers as $user) {
+            // Simpan data harian
+            GlobalProfitSharingDaily::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'date' => $date,
+                ],
+                [
+                    'amount' => $gpsAmountPerMember,
+                ]
+            );
+            
+            // Ambil atau buat saving record
+            $gpsSaving = GlobalProfitSharingSaving::firstOrCreate(
+                [
+                    'user_id' => $user->id,
+                ],
+                [
+                    'daily_accumulation' => 0,
+                    'wallet_cashback' => 0,
+                    'date' => $date,
+                ]
+            );
+            
+            // Tambahkan akumulasi harian
+            $dailyAccumulation = $gpsSaving->daily_accumulation + $gpsAmountPerMember;
+            // Batas wallet cashback maksimal 22.500.000 (tidak ada batas tahunan)
+            $walletCashback = min($dailyAccumulation, 22500000);
+            
+            $gpsSaving->update([
+                'daily_accumulation' => $dailyAccumulation,
+                'wallet_cashback' => $walletCashback,
+                'date' => $date,
             ]);
         }
     }

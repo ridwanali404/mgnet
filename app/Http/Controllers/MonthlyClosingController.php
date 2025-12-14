@@ -369,6 +369,13 @@ class MonthlyClosingController extends Controller
                 ->where('description', 'like', '%bulan ' . $month . '%')
                 ->delete();
 
+            // 5. Hapus bonus Global Profit Sharing yang dibuat saat closing (jika ada)
+            Bonus::where('type', 'Bonus Global Profit Sharing')
+                ->whereYear('created_at', $date->format('Y'))
+                ->whereMonth('created_at', $date->format('m'))
+                ->where('description', 'like', '%bulan ' . $month . '%')
+                ->delete();
+
             // 5. Hapus record MonthlyClosing
             $closing->delete();
 
