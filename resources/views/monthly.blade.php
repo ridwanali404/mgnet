@@ -32,6 +32,104 @@
         .scroll-to-omset:hover small {
             color: #1976d2 !important;
         }
+        
+        /* Override CSS untuk checkbox header check all - Material Design */
+        #check-all-monthly.check-all-header {
+            position: relative !important;
+            left: 0 !important;
+            opacity: 1 !important;
+            width: 18px !important;
+            height: 18px !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            z-index: 1 !important;
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+        }
+        
+        /* Material Design styling untuk checkbox header */
+        #check-all-monthly.check-all-header:before {
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 18px !important;
+            height: 18px !important;
+            border: 2px solid #5a5a5a !important;
+            border-radius: 1px !important;
+            background-color: #fff !important;
+            z-index: 0 !important;
+        }
+        
+        #check-all-monthly.check-all-header:checked:before {
+            top: -4px !important;
+            left: -5px !important;
+            width: 12px !important;
+            height: 22px !important;
+            border-top: 2px solid transparent !important;
+            border-left: 2px solid transparent !important;
+            border-right: 2px solid #26a69a !important;
+            border-bottom: 2px solid #26a69a !important;
+            transform: rotate(40deg) !important;
+            transform-origin: 100% 100% !important;
+        }
+        
+        /* Material Design checkbox untuk setiap record di DataTables */
+        td.select-checkbox {
+            position: relative !important;
+        }
+        
+        td.select-checkbox:before {
+            content: '' !important;
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 18px !important;
+            height: 18px !important;
+            border: 2px solid #5a5a5a !important;
+            border-radius: 1px !important;
+            z-index: 0 !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        tr.selected td.select-checkbox:before {
+            top: calc(50% - 4px) !important;
+            left: calc(50% - 5px) !important;
+            width: 12px !important;
+            height: 22px !important;
+            border-top: 2px solid transparent !important;
+            border-left: 2px solid transparent !important;
+            border-right: 2px solid #26a69a !important;
+            border-bottom: 2px solid #26a69a !important;
+            transform: translate(-50%, -50%) rotate(40deg) !important;
+            transform-origin: 100% 100% !important;
+        }
+        
+        /* Hide default DataTables checkbox icon and text */
+        td.select-checkbox:after {
+            display: none !important;
+        }
+        
+        td.select-checkbox {
+            cursor: pointer !important;
+            text-align: center !important;
+        }
+        
+        /* Hide any content inside select-checkbox cell */
+        td.select-checkbox > * {
+            display: none !important;
+        }
+        
+        /* Ensure proper sizing */
+        th:first-child,
+        td.select-checkbox {
+            width: 30px !important;
+            min-width: 30px !important;
+            max-width: 30px !important;
+        }
     </style>
 @endsection
 @php
@@ -544,7 +642,9 @@
                                     width="100%">
                                     <thead>
                                         <tr>
-                                            <th><i class="bi bi-square"></i></th>
+                                            <th>
+                                                <input type="checkbox" id="check-all-monthly" class="check-all-header" title="Pilih Semua">
+                                            </th>
                                             <th data-orderable=false>#</th>
                                             <th>Join</th>
                                             <th>Member</th>
@@ -1667,6 +1767,41 @@
                         }
                     },
                 });
+                // Check all functionality
+                $('#check-all-monthly').on('click', function() {
+                    if ($(this).is(':checked')) {
+                        // Select all rows that are not disabled
+                        monthly.rows().every(function() {
+                            var rowData = this.data();
+                            if (rowData[16] == '1') { // Only select payable rows
+                                this.select();
+                            }
+                        });
+                    } else {
+                        // Deselect all rows
+                        monthly.rows().deselect();
+                    }
+                });
+                
+                // Function to update check all checkbox state
+                function updateCheckAllState() {
+                    var selectedRows = monthly.rows({selected: true}).count();
+                    var payableRows = 0;
+                    
+                    monthly.rows().every(function() {
+                        var rowData = this.data();
+                        if (rowData[16] == '1') {
+                            payableRows++;
+                        }
+                    });
+                    
+                    if (selectedRows === payableRows && payableRows > 0) {
+                        $('#check-all-monthly').prop('checked', true);
+                    } else {
+                        $('#check-all-monthly').prop('checked', false);
+                    }
+                }
+                
                 monthly.on('select deselect', function(e, dt, type, indexes) {
                     if (type === 'row') {
                         var payable = monthly.row(indexes).data()[16];
@@ -1688,7 +1823,13 @@
                             } else {
                                 $('#bulk').addClass('d-none');
                             }
+                            
+                            // Update check all checkbox state
+                            updateCheckAllState();
                         }
+                    } else if (type === 'page') {
+                        // Update check all state when page changes
+                        updateCheckAllState();
                     }
                 });
                 var qualified = $('#qualified').DataTable({
