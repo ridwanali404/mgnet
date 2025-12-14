@@ -255,13 +255,13 @@ trait Helper
                                 if ($goldAmount > 0) {
                                     if ($isRO) {
                                         $action = 'RO';
-                                        // Jika AUTORO, hilangkan "paket Gold (RO)"
-                                        if ($roSource == 'AUTORO') {
+                                        // Jika ada roSource (AUTORO atau AUTOMAINTAIN), hilangkan "paket Gold (RO)"
+                                        if ($roSource) {
                                             $pinName = '';
                                             $sourceText = ' (' . $roSource . ')';
                                         } else {
                                             $pinName = 'Gold (RO)';
-                                            $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                            $sourceText = '';
                                         }
                                     } else {
                                         $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
@@ -289,13 +289,13 @@ trait Helper
                                 if ($differenceAmount > 0) {
                                     if ($isRO) {
                                         $action = 'RO';
-                                        // Jika AUTORO, hilangkan "paket Gold (RO)"
-                                        if ($roSource == 'AUTORO') {
+                                        // Jika ada roSource (AUTORO atau AUTOMAINTAIN), hilangkan "paket Gold (RO)"
+                                        if ($roSource) {
                                             $pinName = '';
                                             $sourceText = ' (' . $roSource . ')';
                                         } else {
                                             $pinName = 'Gold (RO)';
-                                            $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                            $sourceText = '';
                                         }
                                     } else {
                                         $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
@@ -344,13 +344,13 @@ trait Helper
                             if ($amount > 0 && $activeUpline->premiumUserPin && in_array($activeUpline->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
                                 if ($isRO) {
                                     $action = 'RO';
-                                    // Jika AUTORO, hilangkan "paket Gold (RO)"
-                                    if ($roSource == 'AUTORO') {
+                                    // Jika ada roSource (AUTORO atau AUTOMAINTAIN), hilangkan "paket Gold (RO)"
+                                    if ($roSource) {
                                         $pinName = '';
                                         $sourceText = ' (' . $roSource . ')';
                                     } else {
                                         $pinName = 'Gold (RO)';
-                                        $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                        $sourceText = '';
                                     }
                                 } else {
                                     $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
