@@ -339,9 +339,8 @@ class TransactionController extends Controller
             if ($user && $transaction->type == 'general') {
                 Helper::checkAndExtendActiveFromRO($user, $transaction->price);
                 
-                // JANGAN trigger Auto RO di sini (saat confirm/paid)
-                // Auto RO hanya di-trigger saat status menjadi 'received' (transaksi sudah selesai)
-                // Ini untuk mencegah duplikasi karena checkAndTriggerAutoROFromPV juga dipanggil di received()
+                // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi paid)
+                Helper::checkAndTriggerAutoROFromPV($user, $transaction->poin);
             }
         }
         // add official_transaction_stockists stocks
@@ -417,10 +416,9 @@ class TransactionController extends Controller
             'status' => 'received'
         ));
         
-        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi received)
-        if ($is_updated && $transaction->user && $transaction->type == 'general') {
-            Helper::checkAndTriggerAutoROFromPV($transaction->user, $transaction->poin);
-        }
+        // JANGAN trigger Auto RO di sini (saat received)
+        // Auto RO sudah di-trigger saat confirm() (status menjadi 'paid')
+        // Ini untuk mencegah duplikasi
         
         if($is_updated) Session::flash('success', 'Updated');
         else Session::flash('error', 'Error while confirm');

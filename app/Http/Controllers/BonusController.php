@@ -261,11 +261,11 @@ class BonusController extends Controller
                         $q_bonuses->whereYear('created_at', date('Y', strtotime($month)))
                             ->whereMonth('created_at', date('m', strtotime($month)))
                             ->where(function ($q) {
-                                $q->where('type', 'Komisi Penjualan');
-                                $q->orWhere('type', 'Bonus Unilevel RO');
-                                $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
-                                $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
-                                $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
+                    $q->where('type', 'Komisi Penjualan');
+                    $q->orWhere('type', 'Bonus Unilevel RO');
+                    $q->orWhere('type', 'Bonus Royalti Profit Sharing 13%');
+                    $q->orWhere('type', 'Bonus Royalti Profit Sharing 70%');
+                    $q->orWhere('type', 'Bonus Royalti Profit Sharing 30%');
                                 // Bonus Profit Sharing lama sudah dihapus, diganti dengan Bonus Global Profit Sharing
                                 // $q->orWhere('type', 'Bonus Profit Sharing');
                                 $q->orWhere('type', 'Bonus Global Profit Sharing');
@@ -275,8 +275,8 @@ class BonusController extends Controller
                     // Atau user yang memiliki GPS saving dengan wallet_cashback > 0 (belum closing)
                     ->orWhereHas('globalProfitSharingSavings', function ($q) {
                         $q->where('wallet_cashback', '>', 0);
-                    });
-                })
+                });
+            })
                 ->with(['bank'])
                 ->oldest()
                 ->get();

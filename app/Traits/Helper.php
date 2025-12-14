@@ -1859,6 +1859,8 @@ trait Helper
         
         // Hitung PV dari transaksi umum
         // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
+        // Catatan: Query ini menghitung transaksi dengan status 'paid', 'packed', 'shipped', 'received'
+        // Saat dipanggil dari confirm(), transaksi baru saja di-update menjadi 'paid', jadi sudah terhitung
         $transactionPoinTotal = Transaction::where('user_id', $user->id)
             ->where('type', 'general')
             ->where('poin', '>', 0)
@@ -1866,19 +1868,23 @@ trait Helper
             ->where('created_at', '<=', $activeUntil)
             ->sum('poin');
         
-        // Tambahkan poin dari transaksi umum yang baru saja dibuat (jika ada)
-        $transactionPoinTotal += $transactionPoin;
+        // JANGAN tambahkan $transactionPoin lagi karena:
+        // - Saat dipanggil dari confirm(), transaksi sudah di-update status menjadi 'paid' dan sudah terhitung di query di atas
+        // - Parameter $transactionPoin hanya untuk backward compatibility, tidak digunakan lagi
         
         // Hitung PV dari official transaction
         // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
+        // Catatan: Query ini menghitung transaksi dengan status 'paid', 'packed', 'shipped', 'received'
+        // Saat dipanggil dari confirm(), transaksi baru saja di-update menjadi 'paid', jadi sudah terhitung
         $officialPoin = OfficialTransaction::where('user_id', $user->id)
             ->where('poin', '>', 0)
             ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
             ->where('created_at', '<=', $activeUntil)
             ->sum('poin');
         
-        // Tambahkan poin dari official transaction yang baru saja dibuat (jika ada)
-        $officialPoin += $officialTransactionPoin;
+        // JANGAN tambahkan $officialTransactionPoin lagi karena:
+        // - Saat dipanggil dari confirm(), transaksi sudah di-update status menjadi 'paid' dan sudah terhitung di query di atas
+        // - Parameter $officialTransactionPoin hanya untuk backward compatibility, tidak digunakan lagi
         
         // Hitung PV dari daily poin dalam masa aktif
         $dailyPoinPV = $user->dailyPoins()
@@ -1914,10 +1920,20 @@ trait Helper
                 DB::beginTransaction();
                 try {
                     // Lock user record untuk mencegah concurrent access
-                    $user = User::lockForUpdate()->find($user->id);
+                    // Gunakan fresh() untuk memastikan data terbaru
+                    $userLocked = User::lockForUpdate()->find($user->id);
+                    if (!$userLocked) {
+                        DB::rollBack();
+                        return false;
+                    }
+                    
+                    // Refresh pin juga untuk memastikan data terbaru
+                    $userLocked->load('premiumUserPin.pin');
+                    $pin = $userLocked->premiumUserPin->pin;
                     
                     // Re-check existingAutoROCount setelah lock (untuk mencegah duplikasi)
-                    $existingAutoROCountAfterLock = $user->userPins()
+                    // Pastikan kita menghitung ulang dengan data terbaru
+                    $existingAutoROCountAfterLock = $userLocked->userPins()
                         ->whereHas('pin', function($q) use ($pin) {
                             $q->where('name', $pin->name);
                         })
@@ -1930,8 +1946,8 @@ trait Helper
                     if ($expectedAutoROCount > $existingAutoROCountAfterLock) {
                         // Buat 1 Auto RO yang terlewat (untuk real-time trigger)
                         // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
-                        $roUserPin = $user->userPins()->create([
-                            'buyer_id' => $user->id,
+                        $roUserPin = $userLocked->userPins()->create([
+                            'buyer_id' => $userLocked->id,
                             'pin_id' => $pin->id,
                             'code' => strtoupper(\Illuminate\Support\Str::random(6)),
                             'name' => $pin->name,
@@ -1945,7 +1961,7 @@ trait Helper
                         Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
                         
                         // Perpanjang masa aktif 45 hari dari Auto RO
-                        Helper::extendActiveStatus($user, 'auto_ro_170pv');
+                        Helper::extendActiveStatus($userLocked, 'auto_ro_170pv');
                         
                         DB::commit();
                         return true;

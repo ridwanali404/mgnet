@@ -194,8 +194,8 @@ class OfficialTransactionController extends Controller
         }
         
         // JANGAN trigger Auto RO di sini (saat store/create)
-        // Auto RO hanya di-trigger saat status menjadi 'received' (transaksi sudah selesai)
-        // Ini untuk mencegah duplikasi karena checkAndTriggerAutoROFromPV juga dipanggil di received()
+        // Auto RO hanya di-trigger saat confirm() (status menjadi 'paid')
+        // Ini untuk mencegah duplikasi
         
         Session::flash('success', 'Transaksi berhasil dibuat');
         return back();
@@ -254,9 +254,12 @@ class OfficialTransactionController extends Controller
             'status' => 'paid',
         ]);
         
-        // JANGAN trigger Auto RO di sini (saat confirm/paid)
-        // Auto RO hanya di-trigger saat status menjadi 'received' (transaksi sudah selesai)
-        // Ini untuk mencegah duplikasi karena checkAndTriggerAutoROFromPV juga dipanggil di received()
+        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi paid)
+        // Parameter kedua: transactionPoin (0 untuk official transaction)
+        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
+        if ($officialTransaction->user) {
+            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, 0, $officialTransaction->poin);
+        }
         
         // check big transaction
         if ($officialTransaction->product->is_big) {
@@ -332,12 +335,9 @@ class OfficialTransactionController extends Controller
             )
         );
         
-        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi received)
-        // Parameter kedua: transactionPoin (0 untuk official transaction)
-        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
-        if ($is_updated && $officialTransaction->user) {
-            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, 0, $officialTransaction->poin);
-        }
+        // JANGAN trigger Auto RO di sini (saat received)
+        // Auto RO sudah di-trigger saat confirm() (status menjadi 'paid')
+        // Ini untuk mencegah duplikasi
         
         if ($is_updated)
             Session::flash('success', 'Updated');
