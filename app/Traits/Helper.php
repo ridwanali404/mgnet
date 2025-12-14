@@ -255,17 +255,28 @@ trait Helper
                                 if ($goldAmount > 0) {
                                     if ($isRO) {
                                         $action = 'RO';
-                                        $pinName = 'Gold (RO)';
-                                        $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                        // Jika AUTORO, hilangkan "paket Gold (RO)"
+                                        if ($roSource == 'AUTORO') {
+                                            $pinName = '';
+                                            $sourceText = ' (' . $roSource . ')';
+                                        } else {
+                                            $pinName = 'Gold (RO)';
+                                            $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                        }
                                     } else {
                                         $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                                         $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                         $sourceText = '';
                                     }
+                                    $description = 'Bonus Generasi dari ' . $action . ' ' . $user->username;
+                                    if ($pinName) {
+                                        $description .= ' paket ' . $pinName;
+                                    }
+                                    $description .= $sourceText . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').';
                                     $goldBonus = $sponsor->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $goldAmount,
-                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . $sourceText . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').',
+                                        'description' => $description,
                                     ]);
                                     Helper::automaintain($sponsor, 'K', $goldBonus->amount, 'Saldo automaintain dari ' . $goldBonus->description);
                                 }
@@ -278,17 +289,28 @@ trait Helper
                                 if ($differenceAmount > 0) {
                                     if ($isRO) {
                                         $action = 'RO';
-                                        $pinName = 'Gold (RO)';
-                                        $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                        // Jika AUTORO, hilangkan "paket Gold (RO)"
+                                        if ($roSource == 'AUTORO') {
+                                            $pinName = '';
+                                            $sourceText = ' (' . $roSource . ')';
+                                        } else {
+                                            $pinName = 'Gold (RO)';
+                                            $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                        }
                                     } else {
                                         $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                                         $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                         $sourceText = '';
                                     }
+                                    $description = 'Bonus Generasi dari ' . $action . ' ' . $user->username;
+                                    if ($pinName) {
+                                        $description .= ' paket ' . $pinName;
+                                    }
+                                    $description .= $sourceText . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').';
                                     $bonus = $platinumUpline->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $differenceAmount,
-                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . $sourceText . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                        'description' => $description,
                                     ]);
                                     Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                                 }
@@ -322,15 +344,28 @@ trait Helper
                             if ($amount > 0 && $activeUpline->premiumUserPin && in_array($activeUpline->premiumUserPin->pin->name, ['Gold', 'Platinum'])) {
                                 if ($isRO) {
                                     $action = 'RO';
-                                    $pinName = 'Gold (RO)';
+                                    // Jika AUTORO, hilangkan "paket Gold (RO)"
+                                    if ($roSource == 'AUTORO') {
+                                        $pinName = '';
+                                        $sourceText = ' (' . $roSource . ')';
+                                    } else {
+                                        $pinName = 'Gold (RO)';
+                                        $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                    }
                                 } else {
                                     $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                     $pinName = $pin->name;
+                                    $sourceText = '';
                                 }
+                                $description = 'Bonus Generasi dari ' . $action . ' ' . $user->username;
+                                if ($pinName) {
+                                    $description .= ' paket ' . $pinName;
+                                }
+                                $description .= $sourceText . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').';
                                 $bonus = $activeUpline->bonuses()->create([
                                     'type' => 'Bonus Generasi',
                                     'amount' => $amount,
-                                    'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' tidak aktif 90 hari) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                    'description' => $description,
                                 ]);
                                 Helper::automaintain($activeUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                             }
@@ -348,17 +383,28 @@ trait Helper
                         if ($amount > 0) {
                             if ($isRO) {
                                 $action = 'RO';
-                                $pinName = 'Gold (RO)';
-                                $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                // Jika AUTORO, hilangkan "paket Gold (RO)"
+                                if ($roSource == 'AUTORO') {
+                                    $pinName = '';
+                                    $sourceText = ' (' . $roSource . ')';
+                                } else {
+                                    $pinName = 'Gold (RO)';
+                                    $sourceText = $roSource ? ' (' . $roSource . ')' : '';
+                                }
                             } else {
                                 $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                                 $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
                                 $sourceText = '';
                             }
+                            $description = 'Bonus Generasi dari ' . $action . ' ' . $user->username;
+                            if ($pinName) {
+                                $description .= ' paket ' . $pinName;
+                            }
+                            $description .= $sourceText . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').';
                             $bonus = $sponsor->bonuses()->create([
                                 'type' => 'Bonus Generasi',
                                 'amount' => $amount,
-                                'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . $sourceText . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                'description' => $description,
                             ]);
                             Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                         }

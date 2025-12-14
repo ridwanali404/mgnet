@@ -424,7 +424,7 @@
                                         <td>
                                             <a href="{{ url('user/' . $member->id . '/profile') }}">{{ $member->username }}</a>
                                         </td>
-                                        <td class="text-right">
+                                        <td class="text-right" data-order="{{ $member->cash_automaintain }}">
                                             <code>{{ number_format($member->cash_automaintain, 0, ',', '.') }}</code>
                                         </td>
                                         <td>
@@ -433,6 +433,15 @@
                                     </tr>
                                 @endforeach
                             </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="2" class="text-right"><strong>Total:</strong></th>
+                                    <th class="text-right" id="total-automaintain">
+                                        <code>{{ number_format($membersWithAutomaintain->sum('cash_automaintain'), 0, ',', '.') }}</code>
+                                    </th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
@@ -530,7 +539,7 @@
                 buttons: [
                     'copy', 'csv', 'excel', 'pdf', 'print'
                 ],
-                "order": [[ 0, "asc" ]]
+                "order": [[ 2, "desc" ]]
             });
             @endif
             @if (auth()->user()->type == 'admin' && $membersAlreadyAutomaintain->count() > 0)
