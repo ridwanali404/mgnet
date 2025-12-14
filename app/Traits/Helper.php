@@ -19,6 +19,7 @@ use App\Models\PinHistory;
 use App\Models\DailyProfit;
 use App\Models\Transaction;
 use App\Models\MonthlyClosing;
+use Illuminate\Support\Facades\DB;
 use App\Models\GlobalDailyPoin;
 use App\Models\OfficialTransaction;
 use App\Models\PowerPlusQualification;
@@ -1908,26 +1909,56 @@ trait Helper
             // Untuk real-time trigger, hanya buat 1 Auto RO per transaksi (yang terlewat saat ini)
             // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
             if ($expectedAutoROCount > $existingAutoROCount) {
-                // Buat 1 Auto RO yang terlewat (untuk real-time trigger)
-                // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
-                $roUserPin = $user->userPins()->create([
-                    'buyer_id' => $user->id,
-                    'pin_id' => $pin->id,
-                    'code' => strtoupper(\Illuminate\Support\Str::random(6)),
-                    'name' => $pin->name,
-                    'price' => $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
-                    'level' => $pin->level,
-                    'is_used' => true,
-                    'is_ro' => true, // Tandai sebagai Repeat Order
-                ]);
-                
-                Helper::pinHistory($roUserPin);
-                Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
-                
-                // Perpanjang masa aktif 45 hari dari Auto RO
-                Helper::extendActiveStatus($user, 'auto_ro_170pv');
-                
-                return true;
+                // Gunakan database lock untuk mencegah race condition dan duplikasi
+                // Lock user record untuk memastikan hanya 1 proses yang membuat Auto RO pada saat yang sama
+                DB::beginTransaction();
+                try {
+                    // Lock user record untuk mencegah concurrent access
+                    $user = User::lockForUpdate()->find($user->id);
+                    
+                    // Re-check existingAutoROCount setelah lock (untuk mencegah duplikasi)
+                    $existingAutoROCountAfterLock = $user->userPins()
+                        ->whereHas('pin', function($q) use ($pin) {
+                            $q->where('name', $pin->name);
+                        })
+                        ->where('is_ro', true)
+                        ->where('is_used', true)
+                        ->where('created_at', '<=', $activeUntil)
+                        ->count();
+                    
+                    // Jika masih ada Auto RO yang belum dibuat setelah lock
+                    if ($expectedAutoROCount > $existingAutoROCountAfterLock) {
+                        // Buat 1 Auto RO yang terlewat (untuk real-time trigger)
+                        // Seeder akan handle semua yang terlewat dengan tanggal yang tepat
+                        $roUserPin = $user->userPins()->create([
+                            'buyer_id' => $user->id,
+                            'pin_id' => $pin->id,
+                            'code' => strtoupper(\Illuminate\Support\Str::random(6)),
+                            'name' => $pin->name,
+                            'price' => $pin->ro_price ?? ($pin->name == 'Platinum' ? 12750000 : 1700000), // Gunakan harga RO
+                            'level' => $pin->level,
+                            'is_used' => true,
+                            'is_ro' => true, // Tandai sebagai Repeat Order
+                        ]);
+                        
+                        Helper::pinHistory($roUserPin);
+                        Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
+                        
+                        // Perpanjang masa aktif 45 hari dari Auto RO
+                        Helper::extendActiveStatus($user, 'auto_ro_170pv');
+                        
+                        DB::commit();
+                        return true;
+                    } else {
+                        // Auto RO sudah dibuat oleh proses lain, skip
+                        DB::rollBack();
+                        return false;
+                    }
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    \Log::error('Error creating Auto RO: ' . $e->getMessage());
+                    return false;
+                }
             }
         }
         

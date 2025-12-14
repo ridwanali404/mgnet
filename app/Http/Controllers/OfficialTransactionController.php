@@ -193,12 +193,9 @@ class OfficialTransactionController extends Controller
             ]);
         }
         
-        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif
-        // Parameter kedua: transactionPoin (0 untuk official transaction)
-        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
-        if ($user) {
-            Helper::checkAndTriggerAutoROFromPV($user, 0, $officialTransaction->poin);
-        }
+        // JANGAN trigger Auto RO di sini (saat store/create)
+        // Auto RO hanya di-trigger saat status menjadi 'received' (transaksi sudah selesai)
+        // Ini untuk mencegah duplikasi karena checkAndTriggerAutoROFromPV juga dipanggil di received()
         
         Session::flash('success', 'Transaksi berhasil dibuat');
         return back();
@@ -257,12 +254,9 @@ class OfficialTransactionController extends Controller
             'status' => 'paid',
         ]);
         
-        // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi paid)
-        // Parameter kedua: transactionPoin (0 untuk official transaction)
-        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
-        if ($officialTransaction->user) {
-            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, 0, $officialTransaction->poin);
-        }
+        // JANGAN trigger Auto RO di sini (saat confirm/paid)
+        // Auto RO hanya di-trigger saat status menjadi 'received' (transaksi sudah selesai)
+        // Ini untuk mencegah duplikasi karena checkAndTriggerAutoROFromPV juga dipanggil di received()
         
         // check big transaction
         if ($officialTransaction->product->is_big) {
