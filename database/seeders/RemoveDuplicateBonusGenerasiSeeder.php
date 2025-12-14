@@ -16,6 +16,10 @@ class RemoveDuplicateBonusGenerasiSeeder extends Seeder
      * Seeder untuk menghapus bonus generasi yang duplikat
      * Duplikat terjadi karena Auto RO dibuat duplikat (masalah query existingAutoROCount)
      * 
+     * Logika: Jika bonus memiliki user_id, description, dan amount yang sama persis,
+     * dan dibuat dalam waktu < 1 menit, maka itu adalah duplikat.
+     * Hanya bonus pertama (terlama) yang disimpan, sisanya dihapus.
+     * 
      * @return void
      */
     public function run()
@@ -46,29 +50,43 @@ class RemoveDuplicateBonusGenerasiSeeder extends Seeder
             // Jika ada lebih dari 1 bonus dengan key yang sama, cek apakah duplikat
             if ($bonuses->count() > 1) {
                 // Sort by created_at
-                $sorted = $bonuses->sortBy('created_at');
-                $first = $sorted->first();
+                $sorted = $bonuses->sortBy('created_at')->values();
+                $toKeep = [];
+                $toDelete = [];
                 
-                // Cek bonus lain yang dibuat dalam waktu yang sangat dekat (dalam 1 menit)
-                $duplicateBonuses = $sorted->filter(function($bonus) use ($first) {
-                    if ($bonus->id == $first->id) {
-                        return false; // Skip yang pertama
+                // Bandingkan setiap bonus dengan bonus lain dalam grup
+                // Jika ada 2 bonus yang dibuat dalam waktu < 1 menit, hapus yang kedua
+                for ($i = 0; $i < $sorted->count(); $i++) {
+                    $current = $sorted[$i];
+                    $isDuplicate = false;
+                    
+                    // Cek apakah bonus ini dibuat dalam waktu < 1 menit dengan bonus sebelumnya yang sudah disimpan
+                    foreach ($toKeep as $kept) {
+                        $timeDiff = abs($current->created_at->diffInSeconds($kept->created_at));
+                        if ($timeDiff < 60) {
+                            // Bonus ini adalah duplikat dari bonus yang sudah disimpan
+                            $isDuplicate = true;
+                            break;
+                        }
                     }
                     
-                    // Cek apakah dibuat dalam waktu yang sangat dekat (dalam 1 menit)
-                    $timeDiff = abs($bonus->created_at->diffInSeconds($first->created_at));
-                    return $timeDiff < 60; // Dalam 1 menit
-                });
+                    if ($isDuplicate) {
+                        $toDelete[] = $current->id;
+                    } else {
+                        $toKeep[] = $current;
+                    }
+                }
                 
-                if ($duplicateBonuses->count() > 0) {
+                if (count($toDelete) > 0) {
+                    $first = $toKeep[0];
                     $duplicates[] = [
                         'user_id' => $first->user_id,
                         'description' => $first->description,
                         'amount' => $first->amount,
                         'first_id' => $first->id,
                         'first_created' => $first->created_at,
-                        'duplicate_ids' => $duplicateBonuses->pluck('id')->toArray(),
-                        'duplicate_count' => $duplicateBonuses->count(),
+                        'duplicate_ids' => $toDelete,
+                        'duplicate_count' => count($toDelete),
                     ];
                 }
             }
