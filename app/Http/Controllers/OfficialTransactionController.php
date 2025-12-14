@@ -194,8 +194,10 @@ class OfficialTransactionController extends Controller
         }
         
         // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif
+        // Parameter kedua: transactionPoin (0 untuk official transaction)
+        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
         if ($user) {
-            Helper::checkAndTriggerAutoROFromPV($user, $officialTransaction->poin);
+            Helper::checkAndTriggerAutoROFromPV($user, 0, $officialTransaction->poin);
         }
         
         Session::flash('success', 'Transaksi berhasil dibuat');
@@ -256,8 +258,10 @@ class OfficialTransactionController extends Controller
         ]);
         
         // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi paid)
+        // Parameter kedua: transactionPoin (0 untuk official transaction)
+        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
         if ($officialTransaction->user) {
-            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, $officialTransaction->poin);
+            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, 0, $officialTransaction->poin);
         }
         
         // check big transaction
@@ -335,8 +339,10 @@ class OfficialTransactionController extends Controller
         );
         
         // Cek dan trigger Auto RO jika mencapai 170 PV dalam masa aktif (setelah status menjadi received)
+        // Parameter kedua: transactionPoin (0 untuk official transaction)
+        // Parameter ketiga: officialTransactionPoin (poin dari official transaction)
         if ($is_updated && $officialTransaction->user) {
-            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, $officialTransaction->poin);
+            Helper::checkAndTriggerAutoROFromPV($officialTransaction->user, 0, $officialTransaction->poin);
         }
         
         if ($is_updated)

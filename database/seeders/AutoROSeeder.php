@@ -63,22 +63,27 @@ class AutoROSeeder extends Seeder
                 }
                 
                 // Hitung total PV yang terkumpul dalam masa aktif
+                // Periode aktif: dari activeFrom sampai activeUntil
+                // Tapi untuk perhitungan PV, kita hitung semua transaksi yang dibuat sebelum active_until
+                // (bukan hanya yang dalam periode aktif, karena transaksi bisa dibuat sebelum periode aktif dimulai)
                 $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
                 $activeUntil = Carbon::parse($user->active_until);
                 
-                // Hitung PV dari transaksi umum dalam masa aktif
+                // Hitung PV dari transaksi umum
+                // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
                 $transactionPoinTotal = Transaction::where('user_id', $user->id)
                     ->where('type', 'general')
                     ->where('poin', '>', 0)
                     ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-                    ->whereBetween('created_at', [$activeFrom, $activeUntil])
+                    ->where('created_at', '<=', $activeUntil)
                     ->sum('poin');
                 
-                // Hitung PV dari official transaction dalam masa aktif
+                // Hitung PV dari official transaction
+                // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
                 $officialPoin = OfficialTransaction::where('user_id', $user->id)
                     ->where('poin', '>', 0)
                     ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-                    ->whereBetween('created_at', [$activeFrom, $activeUntil])
+                    ->where('created_at', '<=', $activeUntil)
                     ->sum('poin');
                 
                 // Hitung PV dari daily poin dalam masa aktif
@@ -95,14 +100,15 @@ class AutoROSeeder extends Seeder
                     // Setiap kelipatan 170 PV = 1 Auto RO (170, 340, 510, 680, dst)
                     $expectedAutoROCount = floor($totalPVInActive / 170);
                     
-                    // Hitung berapa Auto RO yang sudah ada dalam masa aktif
+                    // Hitung berapa Auto RO yang sudah ada
+                    // Hitung semua Auto RO yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
                     $existingAutoROCount = $user->userPins()
                         ->whereHas('pin', function($q) use ($pin) {
                             $q->where('name', $pin->name);
                         })
                         ->where('is_ro', true)
                         ->where('is_used', true)
-                        ->whereBetween('created_at', [$activeFrom, $activeUntil])
+                        ->where('created_at', '<=', $activeUntil)
                         ->count();
                     
                     // Jika masih ada Auto RO yang belum dibuat, buat yang terlewat
@@ -115,11 +121,12 @@ class AutoROSeeder extends Seeder
                             $allTransactions = collect();
                             
                             // Ambil transaksi umum
+                            // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
                             $transactions = Transaction::where('user_id', $user->id)
                                 ->where('type', 'general')
                                 ->where('poin', '>', 0)
                                 ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-                                ->whereBetween('created_at', [$activeFrom, $activeUntil])
+                                ->where('created_at', '<=', $activeUntil)
                                 ->orderBy('created_at', 'asc')
                                 ->get();
                             
@@ -131,10 +138,11 @@ class AutoROSeeder extends Seeder
                             }
                             
                             // Ambil official transaction
+                            // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
                             $officialTransactions = OfficialTransaction::where('user_id', $user->id)
                                 ->where('poin', '>', 0)
                                 ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-                                ->whereBetween('created_at', [$activeFrom, $activeUntil])
+                                ->where('created_at', '<=', $activeUntil)
                                 ->orderBy('created_at', 'asc')
                                 ->get();
                             
@@ -188,6 +196,32 @@ class AutoROSeeder extends Seeder
                                 $roDates[] = $lastDate;
                             }
                             
+                            // Cek Auto RO yang sudah ada dan perbaiki tanggalnya jika salah
+                            $existingAutoROs = $user->userPins()
+                                ->whereHas('pin', function($q) use ($pin) {
+                                    $q->where('name', $pin->name);
+                                })
+                                ->where('is_ro', true)
+                                ->where('is_used', true)
+                                ->where('created_at', '<=', $activeUntil)
+                                ->orderBy('created_at', 'asc')
+                                ->get();
+                            
+                            // Update tanggal Auto RO yang sudah ada jika tidak sesuai
+                            foreach ($existingAutoROs as $index => $existingRO) {
+                                if (isset($roDates[$index])) {
+                                    $expectedDate = $roDates[$index];
+                                    // Jika tanggal berbeda lebih dari 1 menit, update
+                                    if (abs($existingRO->created_at->diffInSeconds($expectedDate)) > 60) {
+                                        $existingRO->update([
+                                            'created_at' => $expectedDate,
+                                            'updated_at' => $expectedDate,
+                                        ]);
+                                        $this->command->info("✓ Auto RO ID {$existingRO->id} tanggal diperbaiki untuk {$user->username} (dari {$existingRO->created_at->format('Y-m-d H:i:s')} ke {$expectedDate->format('Y-m-d H:i:s')})");
+                                    }
+                                }
+                            }
+                            
                             // Ambil hanya tanggal untuk Auto RO yang terlewat (mulai dari yang sudah ada)
                             $roDatesToCreate = array_slice($roDates, $existingAutoROCount, $missingAutoROCount);
                             
@@ -210,7 +244,7 @@ class AutoROSeeder extends Seeder
                                 Helper::upgrade($roUserPin); // Ini akan membuat bonus generasi ke atas
                                 
                                 $created++;
-                                $this->command->info("✓ Auto RO dibuat untuk {$user->username} (PV: {$totalPVInActive}, Expected: {$expectedAutoROCount}, Existing: {$existingAutoROCount}, Tanggal: {$roDate->format('Y-m-d')})");
+                                $this->command->info("✓ Auto RO dibuat untuk {$user->username} (PV: {$totalPVInActive}, Expected: {$expectedAutoROCount}, Existing: {$existingAutoROCount}, Tanggal: {$roDate->format('Y-m-d H:i:s')})");
                             }
                             
                             // Perpanjang masa aktif 45 hari dari Auto RO (jika belum diperpanjang)

@@ -1798,8 +1798,12 @@ trait Helper
      * Cek dan trigger Auto RO berdasarkan 170 PV dalam masa aktif
      * Mirip dengan Automaintain, tapi trigger dari belanja online yang mencapai 170 PV
      * Dipanggil setelah transaksi dibuat (Transaction atau OfficialTransaction)
+     * 
+     * @param User $user User yang akan dicek
+     * @param int $transactionPoin Poin dari Transaction (general) yang baru dibuat
+     * @param int $officialTransactionPoin Poin dari OfficialTransaction yang baru dibuat
      */
-    public static function checkAndTriggerAutoROFromPV($user, $transactionPoin = 0)
+    public static function checkAndTriggerAutoROFromPV($user, $transactionPoin = 0, $officialTransactionPoin = 0)
     {
         // Cek apakah user masih dalam masa aktif
         if (!$user->active_until) {
@@ -1819,27 +1823,35 @@ trait Helper
             return false;
         }
 
-        // Hitung total PV yang terkumpul dalam masa aktif (dari tanggal mulai aktif sampai sekarang)
+        // Hitung total PV yang terkumpul dalam masa aktif
+        // Periode aktif: dari activeFrom sampai activeUntil
+        // Tapi untuk perhitungan PV, kita hitung semua transaksi yang dibuat sebelum active_until
+        // (bukan hanya yang dalam periode aktif, karena transaksi bisa dibuat sebelum periode aktif dimulai)
         $activeFrom = Carbon::parse($user->active_until)->subDays($user->active_days_initial ?? 45);
         $activeUntil = Carbon::parse($user->active_until);
         
-        // Hitung PV dari transaksi umum dalam masa aktif
+        // Hitung PV dari transaksi umum
+        // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
         $transactionPoinTotal = Transaction::where('user_id', $user->id)
             ->where('type', 'general')
             ->where('poin', '>', 0)
             ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-            ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+            ->where('created_at', '<=', $activeUntil)
             ->sum('poin');
         
-        // Tambahkan poin dari transaksi yang baru saja dibuat (jika ada)
+        // Tambahkan poin dari transaksi umum yang baru saja dibuat (jika ada)
         $transactionPoinTotal += $transactionPoin;
         
-        // Hitung PV dari official transaction dalam masa aktif
+        // Hitung PV dari official transaction
+        // Hitung semua transaksi yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
         $officialPoin = OfficialTransaction::where('user_id', $user->id)
             ->where('poin', '>', 0)
             ->whereIn('status', ['paid', 'packed', 'shipped', 'received'])
-            ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+            ->where('created_at', '<=', $activeUntil)
             ->sum('poin');
+        
+        // Tambahkan poin dari official transaction yang baru saja dibuat (jika ada)
+        $officialPoin += $officialTransactionPoin;
         
         // Hitung PV dari daily poin dalam masa aktif
         $dailyPoinPV = $user->dailyPoins()
