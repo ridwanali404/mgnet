@@ -128,6 +128,7 @@ class UserService
      */
     public function monthlyQualified(User $user, $month)
     {
+        return true;
         $qty = $this->monthlyPoin($user, $month);
         if ($qty >= 39) {
             return true;

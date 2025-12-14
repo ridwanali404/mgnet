@@ -86,7 +86,7 @@
             @endforeach
         @else
             <div class="row">
-                <div class="col-md-{{ auth()->user()->isAlreadyAutomaintain(date('Y-m')) && !$claim? '12': '6' }}">
+                <div class="col-md-{{ ($cash >= $automaintainLimit || $claim) ? '12': '6' }}">
                     <div class="card card-inverse card-cr">
                         <div class="card-body">
                             <div class="d-flex">
@@ -107,7 +107,7 @@
                         </div>
                     </div>
                 </div>
-                @if (!auth()->user()->isAlreadyAutomaintain(date('Y-m')))
+                @if ($cash < $automaintainLimit)
                     <div class="col-md-6">
                         <div class="card card-inverse card-cr">
                             <div class="card-body">
@@ -156,7 +156,7 @@
                     </div>
                 @endif
             </div>
-            @if (!auth()->user()->isAlreadyAutomaintain(date('Y-m')))
+            @if ($cash < $automaintainLimit)
                 <div class="card-group">
                     <div class="card">
                         <div class="card-body">
@@ -216,7 +216,7 @@
                     </div>
                 </div>
             @endif
-            @if (!auth()->user()->isAlreadyAutomaintain(date('Y-m')))
+            @if ($cash < $automaintainLimit)
                 <div class="modal inmodal" id="topup" role="dialog" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content animated fadeInDown">
@@ -232,7 +232,7 @@
                                     <div class="form-group">
                                         <label>Nominal</label>
                                         <input type="number" class="form-control" name="amount"
-                                            value="{{ $cash >= $automaintainLimit ? 0 : $automaintainLimit - $cash }}" min="1" readonly
+                                            value="{{ $automaintainLimit - $cash }}" min="1" readonly
                                             required>
                                     </div>
                                 </div>

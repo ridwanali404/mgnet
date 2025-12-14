@@ -211,14 +211,25 @@ class ApiController extends Controller
         
         // Jika ada qualification, gunakan data dari qualification
         if ($qualification && $qualification->leg_omzets) {
-            foreach ($qualification->leg_omzets as $legName => $omzet) {
-                $completeLegOmzets[$legName] = $omzet;
+            // Pastikan leg_omzets selalu array
+            $legOmzetsData = $qualification->leg_omzets;
+            // Jika masih string (JSON), decode dulu
+            if (is_string($legOmzetsData)) {
+                $legOmzetsData = json_decode($legOmzetsData, true) ?: [];
+            }
+            // Pastikan adalah array sebelum foreach
+            if (is_array($legOmzetsData)) {
+                foreach ($legOmzetsData as $legName => $omzet) {
+                    $completeLegOmzets[$legName] = $omzet;
+                }
             }
         } else {
             // Jika belum ada data, hitung langsung
             $legOmzets = \App\Traits\Helper::calculateAllLegOmzetMonthly($user, $month);
-            foreach ($legOmzets as $legName => $omzet) {
-                $completeLegOmzets[$legName] = $omzet;
+            if (is_array($legOmzets)) {
+                foreach ($legOmzets as $legName => $omzet) {
+                    $completeLegOmzets[$legName] = $omzet;
+                }
             }
         }
         

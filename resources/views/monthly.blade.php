@@ -133,8 +133,20 @@
                                     ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
                                     ->orderBy('date', 'desc')
                                     ->first();
-                                $legOmzets = $latestQualification && $latestQualification->leg_omzets ? $latestQualification->leg_omzets : [];
-                                $hasData = !empty($legOmzets);
+                                
+                                // Pastikan leg_omzets selalu array
+                                $legOmzets = [];
+                                if ($latestQualification && $latestQualification->leg_omzets) {
+                                    $legOmzetsData = $latestQualification->leg_omzets;
+                                    // Jika masih string (JSON), decode dulu
+                                    if (is_string($legOmzetsData)) {
+                                        $legOmzets = json_decode($legOmzetsData, true) ?: [];
+                                    } elseif (is_array($legOmzetsData)) {
+                                        $legOmzets = $legOmzetsData;
+                                    }
+                                }
+                                
+                                $hasData = !empty($legOmzets) && is_array($legOmzets);
                                 $totalOmzet = $hasData ? array_sum($legOmzets) : 0;
                             @endphp
                             <div class="d-flex flex-row">
@@ -522,7 +534,7 @@
                                         <option>Harus dibayar</option>
                                         <option>Sudah dibayar</option>
                                         <option>Menunggu pembayaran</option>
-                                        <option>Belum qualified</option>
+                                        {{-- <option>Belum qualified</option> --}}
                                     </select>
                                 </div>
                             </div>
@@ -832,11 +844,11 @@
                                         @endphp
                                         @foreach ($gpsDailyByDate as $dateData)
                                             <tr data-date="{{ $dateData->date }}">
-                                                <td>{{ $counter++ }}</td>
-                                                <td>
+                                                    <td>{{ $counter++ }}</td>
+                                                    <td>
                                                     <code>{{ \Carbon\Carbon::parse($dateData->date)->translatedFormat('d F Y') }}</code>
-                                                </td>
-                                                <td class="text-right">
+                                                    </td>
+                                                    <td class="text-right">
                                                     <code>{{ number_format($dateData->total_amount, 0, ',', '.') }}</code>
                                                 </td>
                                                 <td class="text-center">
@@ -849,8 +861,8 @@
                                                             data-target="#gps-detail-modal">
                                                         <i class="mdi mdi-eye"></i> Lihat Rincian
                                                     </button>
-                                                </td>
-                                            </tr>
+                                                    </td>
+                                                </tr>
                                         @endforeach
                                     </tbody>
                                 </table>
@@ -1176,27 +1188,27 @@
                                         @if($gpsBonuses->count() > 0)
                                             {{-- Tampilkan bonus yang sudah dibuat (setelah closing) --}}
                                             @foreach ($gpsBonuses as $a)
-                                                <tr>
-                                                    <td>{{ $loop->index + 1 }}</td>
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
                                                     <td><code>{{ $a->created_at->format('Y-m-d') }}</code></td>
-                                                    <td class="text-right">
-                                                        <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
-                                                    </td>
-                                                    <td>{{ $a->description }}</td>
-                                                </tr>
-                                            @endforeach
+                                                <td class="text-right">
+                                                    <code>{{ number_format($a->amount, 0, ',', '.') }}</code>
+                                                </td>
+                                                <td>{{ $a->description }}</td>
+                                            </tr>
+                                        @endforeach
                                         @elseif($gpsDaily->count() > 0)
                                             {{-- Tampilkan GPS daily sebagai potensi (belum closing) --}}
                                             @foreach ($gpsDaily as $daily)
-                                                <tr>
-                                                    <td>{{ $loop->index + 1 }}</td>
+                                            <tr>
+                                                <td>{{ $loop->index + 1 }}</td>
                                                     <td><code>{{ \Carbon\Carbon::parse($daily->date)->format('Y-m-d') }}</code></td>
-                                                    <td class="text-right">
-                                                        <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
-                                                    </td>
+                                                <td class="text-right">
+                                                    <code>{{ number_format($daily->amount, 0, ',', '.') }}</code>
+                                                </td>
                                                     <td>Global Profit Sharing harian</td>
-                                                </tr>
-                                            @endforeach
+                                            </tr>
+                                        @endforeach
                                         @endif
                                     </tbody>
                                     @if($totalGpsPotential > 0 && $gpsBonuses->count() == 0)
@@ -1280,7 +1292,13 @@
                                 // Ambil leg_omzets dari latest qualification atau hitung langsung
                                 $legOmzets = [];
                                 if ($latestQualification && $latestQualification->leg_omzets) {
-                                    $legOmzets = $latestQualification->leg_omzets;
+                                    $legOmzetsData = $latestQualification->leg_omzets;
+                                    // Jika masih string (JSON), decode dulu
+                                    if (is_string($legOmzetsData)) {
+                                        $legOmzets = json_decode($legOmzetsData, true) ?: [];
+                                    } elseif (is_array($legOmzetsData)) {
+                                        $legOmzets = $legOmzetsData;
+                                    }
                                 } else {
                                     // Hanya hitung jika ada leg
                                     if (!empty($allLegs)) {

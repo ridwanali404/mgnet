@@ -15,6 +15,8 @@ use Carbon\Carbon;
 use App\Traits\Helper;
 use App\Models\DailyPoin;
 use App\Models\ProfitSharing;
+use App\Models\PowerPlusQualification;
+use App\Models\GlobalProfitSharingSaving;
 
 class MonthlyClosingController extends Controller
 {
@@ -368,15 +370,52 @@ class MonthlyClosingController extends Controller
                 ->whereMonth('created_at', $date->format('m'))
                 ->where('description', 'like', '%bulan ' . $month . '%')
                 ->delete();
+            
+            // Reset bonus_amount di PowerPlusQualification untuk bulan tersebut
+            $endDate = $date->format('Y-m-t');
+            \App\Models\PowerPlusQualification::where('date', $endDate)
+                ->update(['bonus_amount' => 0]);
 
             // 5. Hapus bonus Global Profit Sharing yang dibuat saat closing (jika ada)
-            Bonus::where('type', 'Bonus Global Profit Sharing')
+            // Tapi JANGAN hapus GPS daily karena generate per hari
+            $gpsBonuses = Bonus::where('type', 'Bonus Global Profit Sharing')
                 ->whereYear('created_at', $date->format('Y'))
                 ->whereMonth('created_at', $date->format('m'))
                 ->where('description', 'like', '%bulan ' . $month . '%')
-                ->delete();
+                ->get();
+            
+            // Restore GPS saving dari GPS daily untuk bulan tersebut
+            foreach ($gpsBonuses as $gpsBonus) {
+                $user = $gpsBonus->user;
+                if ($user) {
+                    // Hitung ulang wallet_cashback dari GPS daily untuk bulan tersebut
+                    $startDate = $date->format('Y-m-01');
+                    $endDate = $date->format('Y-m-t');
+                    
+                    $gpsDailyTotal = $user->globalProfitSharingDailies()
+                        ->whereBetween('date', [$startDate, $endDate])
+                        ->sum('amount');
+                    
+                    // Update atau create GPS saving
+                    $gpsSaving = \App\Models\GlobalProfitSharingSaving::firstOrCreate(
+                        ['user_id' => $user->id],
+                        ['daily_accumulation' => 0, 'wallet_cashback' => 0, 'date' => $endDate]
+                    );
+                    
+                    // Restore wallet_cashback (capped at 22.5jt)
+                    $walletCashback = min($gpsDailyTotal, 22500000);
+                    $gpsSaving->update([
+                        'daily_accumulation' => $gpsDailyTotal,
+                        'wallet_cashback' => $walletCashback,
+                        'date' => $endDate,
+                    ]);
+                }
+            }
+            
+            // Hapus bonus GPS setelah restore saving
+            $gpsBonuses->each->delete();
 
-            // 5. Hapus record MonthlyClosing
+            // 6. Hapus record MonthlyClosing
             $closing->delete();
 
             \DB::commit();

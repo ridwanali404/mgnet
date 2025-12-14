@@ -1245,21 +1245,18 @@ trait Helper
         $startDate = $date->format('Y-m-01');
         $endDate = $date->format('Y-m-t');
         
-        // Dapatkan semua user yang memiliki 2 tim aktif (kiri & kanan)
+        // Dapatkan semua user premium aktif yang memiliki minimal 2 uplines premium
+        // Syarat: minimal 2 grup dengan omset tertentu (tidak perlu left/right team)
         $qualifiedUsers = User::whereHas('premiumUserPin')
             ->where('is_active', true)
             ->get()
             ->filter(function ($user) {
-                // Menggunakan upline_id untuk tree bonus (kecuali bonus sponsor dan generasi)
-                $leftTeam = $user->uplines()->where('placement_side', 'left')
+                // Minimal 2 uplines premium aktif (untuk bisa punya minimal 2 grup)
+                $premiumUplines = $user->uplines()
                     ->whereHas('premiumUserPin')
                     ->where('is_active', true)
                     ->count();
-                $rightTeam = $user->uplines()->where('placement_side', 'right')
-                    ->whereHas('premiumUserPin')
-                    ->where('is_active', true)
-                    ->count();
-                return $leftTeam >= 1 && $rightTeam >= 1;
+                return $premiumUplines >= 2;
             });
         
         foreach ($qualifiedUsers as $user) {
@@ -1305,11 +1302,12 @@ trait Helper
             );
         }
         
-        // Hitung total payout perusahaan bulanan (8% dari total omzet bulanan)
-        $totalOmzet = Helper::transactionPoin($date) * 1000;
-        $totalPayout = round($totalOmzet * 0.08); // 8% untuk Power Plus
+        // Hitung total omset nasional bulanan (Total penjualan Pin sebulanan)
+        $totalOmzet = Helper::transactionPoin($date) * 1000; // Convert poin ke rupiah (1 poin = 1000)
         
         // Distribusi ke qualified members
+        // Grade 1: 4% dari omset nasional dibagi mitra yang qualified di kelompok 15k-30k
+        // Grade 2: 4% dari omset nasional dibagi mitra yang qualified di kelompok >=30k
         $qualified15k = PowerPlusQualification::where('date', $endDate)
             ->where('is_qualified_15k', true)
             ->count();
@@ -1318,30 +1316,55 @@ trait Helper
             ->count();
         
         if ($qualified15k > 0) {
-            $bonus15k = round(($totalPayout * 0.04) / $qualified15k); // 4% dibagi jumlah qualified
+            $bonus15k = round(($totalOmzet * 0.04) / $qualified15k); // 4% dari omset nasional dibagi jumlah qualified Grade 1
             PowerPlusQualification::where('date', $endDate)
                 ->where('is_qualified_15k', true)
                 ->get()
-                ->each(function ($qualification) use ($bonus15k, $month) {
-                    $qualification->update(['bonus_amount' => $bonus15k]);
-                    $qualification->user->bonuses()->create([
-                        'type' => 'Bonus Power Plus',
-                        'amount' => $bonus15k,
-                        'description' => 'Bonus Power Plus untuk omzet kaki kecil 15.000 point bulan ' . $month . '.',
-                        'created_at' => $month . '-01 00:00:00',
-                        'updated_at' => $month . '-01 00:00:00',
-                    ]);
+                ->each(function ($qualification) use ($bonus15k, $month, $endDate) {
+                    // Cek apakah bonus 15k sudah pernah dibuat untuk bulan ini
+                    $existingBonus15k = $qualification->user->bonuses()
+                        ->whereYear('created_at', date('Y', strtotime($month)))
+                        ->whereMonth('created_at', date('m', strtotime($month)))
+                        ->where('type', 'Bonus Power Plus')
+                        ->where('description', 'like', '%15.000 point%')
+                        ->exists();
+                    
+                    if (!$existingBonus15k) {
+                        // Update bonus_amount: set ke bonus15k (akan ditambah bonus30k nanti jika qualified)
+                        $qualification->update(['bonus_amount' => $bonus15k]);
+                        
+                        // Buat bonus baru untuk Grade 1
+                        $qualification->user->bonuses()->create([
+                            'type' => 'Bonus Power Plus',
+                            'amount' => $bonus15k,
+                            'description' => 'Bonus Power Plus untuk omzet kaki kecil 15.000 point bulan ' . $month . '.',
+                            'created_at' => $month . '-01 00:00:00',
+                            'updated_at' => $month . '-01 00:00:00',
+                        ]);
+                    }
                 });
         }
         
         if ($qualified30k > 0) {
-            $bonus30k = round(($totalPayout * 0.04) / $qualified30k); // 4% dibagi jumlah qualified
+            $bonus30k = round(($totalOmzet * 0.04) / $qualified30k); // 4% dari omset nasional dibagi jumlah qualified Grade 2
             PowerPlusQualification::where('date', $endDate)
                 ->where('is_qualified_30k', true)
                 ->get()
-                ->each(function ($qualification) use ($bonus30k, $month) {
-                    if ($qualification->bonus_amount == 0) {
-                        $qualification->update(['bonus_amount' => $bonus30k]);
+                ->each(function ($qualification) use ($bonus30k, $month, $endDate) {
+                    // Cek apakah bonus 30k sudah pernah dibuat untuk bulan ini
+                    $existingBonus30k = $qualification->user->bonuses()
+                        ->whereYear('created_at', date('Y', strtotime($month)))
+                        ->whereMonth('created_at', date('m', strtotime($month)))
+                        ->where('type', 'Bonus Power Plus')
+                        ->where('description', 'like', '%30.000 point%')
+                        ->exists();
+                    
+                    if (!$existingBonus30k) {
+                        // Update bonus_amount: jika sudah ada bonus 15k, tambahkan dengan bonus 30k
+                        $currentBonus = $qualification->bonus_amount;
+                        $qualification->update(['bonus_amount' => $currentBonus + $bonus30k]);
+                        
+                        // Buat bonus baru untuk Grade 2
                         $qualification->user->bonuses()->create([
                             'type' => 'Bonus Power Plus',
                             'amount' => $bonus30k,

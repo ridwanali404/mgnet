@@ -36,10 +36,24 @@ class RunMonthlyClosing extends Command
 
         $this->info("Memulai closing untuk bulan: {$month}");
 
-        // Check if already closed
-        if (MonthlyClosing::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))->count()) {
+        // Check if already closed, jika ada langsung cancel dulu
+        $existingClosing = MonthlyClosing::whereYear('created_at', $date->format('Y'))
+            ->whereMonth('created_at', $date->format('m'))
+            ->first();
+        
+        if ($existingClosing) {
             $this->warn("Closing untuk bulan {$month} sudah pernah dilakukan!");
-            if (!$this->confirm('Apakah Anda ingin melanjutkan? (Ini akan membuat duplikasi bonus)')) {
+            $this->info("Membatalkan closing yang sudah ada...");
+            
+            // Panggil fungsi cancel untuk membatalkan closing yang sudah ada
+            $request = new Request(['month' => $month]);
+            $controller = new MonthlyClosingController();
+            
+            try {
+                $controller->cancel($request);
+                $this->info("✓ Closing sebelumnya berhasil dibatalkan");
+            } catch (\Exception $e) {
+                $this->error("Error saat membatalkan closing: " . $e->getMessage());
                 return;
             }
         }
