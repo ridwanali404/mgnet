@@ -222,8 +222,8 @@ class TreeController extends Controller
                     'description' => $bonus->description ?? '',
                     'amount' => (int) $bonus->amount,
                     'is_poin' => (bool) $bonus->is_poin,
-                    'paid_at' => $bonus->paid_at ? $bonus->paid_at->format('Y-m-d H:i:s') : null,
-                    'used_at' => $bonus->used_at ? $bonus->used_at->format('Y-m-d H:i:s') : null,
+                    'paid_at' => $bonus->paid_at,
+                    'used_at' => $bonus->used_at,
                 ];
             });
 
