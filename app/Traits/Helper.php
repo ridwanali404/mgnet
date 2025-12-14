@@ -184,6 +184,26 @@ trait Helper
         $isRO = $userPin->is_ro ?? false;
         $sponsor = $user->sponsor;
         
+        // Tentukan sumber RO (AUTO RO atau AUTOMAINTAIN)
+        $roSource = null;
+        if ($isRO) {
+            // Cek apakah ada automaintain record yang terkait dengan RO ini
+            $automaintain = $user->automaintains()
+                ->where('type', 'D')
+                ->where('amount', 1700000)
+                ->whereBetween('created_at', [
+                    Carbon::parse($userPin->created_at)->subMinutes(5),
+                    Carbon::parse($userPin->created_at)->addMinutes(5)
+                ])
+                ->first();
+            
+            if ($automaintain) {
+                $roSource = 'AUTOMAINTAIN';
+            } else {
+                $roSource = 'AUTORO';
+            }
+        }
+        
         // Untuk RO, gunakan paket Gold sebagai acuan (seperti join Gold tanpa sponsor)
         if ($isRO) {
             $targetPin = Pin::where('name', 'Gold')->where('type', 'premium')->first();
@@ -234,14 +254,16 @@ trait Helper
                                     if ($isRO) {
                                         $action = 'RO';
                                         $pinName = 'Gold (RO)';
+                                        $sourceText = $roSource ? ' (' . $roSource . ')' : '';
                                     } else {
                                         $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                                         $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                        $sourceText = '';
                                     }
                                     $goldBonus = $sponsor->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $goldAmount,
-                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').',
+                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . $sourceText . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($goldAllocation, 0, ',', '.') . ').',
                                     ]);
                                     Helper::automaintain($sponsor, 'K', $goldBonus->amount, 'Saldo automaintain dari ' . $goldBonus->description);
                                 }
@@ -255,14 +277,16 @@ trait Helper
                                     if ($isRO) {
                                         $action = 'RO';
                                         $pinName = 'Gold (RO)';
+                                        $sourceText = $roSource ? ' (' . $roSource . ')' : '';
                                     } else {
                                         $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                                         $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                        $sourceText = '';
                                     }
                                     $bonus = $platinumUpline->bonuses()->create([
                                         'type' => 'Bonus Generasi',
                                         'amount' => $differenceAmount,
-                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                        'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . $sourceText . '. Generasi ke-' . $i . ' (Push-up dari ' . $sponsor->username . ' Gold) sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                                     ]);
                                     Helper::automaintain($platinumUpline, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                                 }
@@ -323,14 +347,16 @@ trait Helper
                             if ($isRO) {
                                 $action = 'RO';
                                 $pinName = 'Gold (RO)';
+                                $sourceText = $roSource ? ' (' . $roSource . ')' : '';
                             } else {
                                 $pinName = ($pin->type == 'upgrade' && str_contains($pin->name, 'Platinum')) ? 'Platinum' : $pin->name;
                                 $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                                $sourceText = '';
                             }
                             $bonus = $sponsor->bonuses()->create([
                                 'type' => 'Bonus Generasi',
                                 'amount' => $amount,
-                                'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
+                                'description' => 'Bonus Generasi dari ' . $action . ' ' . $user->username . ' paket ' . $pinName . $sourceText . '. Generasi ke-' . $i . ' sebesar ' . $percent . '% dari alokasi (Rp ' . number_format($totalAllocation, 0, ',', '.') . ').',
                             ]);
                             Helper::automaintain($sponsor, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                         }
@@ -1867,14 +1893,15 @@ trait Helper
             // Setiap kelipatan 170 PV = 1 Auto RO (170, 340, 510, 680, dst)
             $expectedAutoROCount = floor($totalPVInActive / 170);
             
-            // Hitung berapa Auto RO yang sudah ada dalam masa aktif
+            // Hitung berapa Auto RO yang sudah ada
+            // Hitung semua Auto RO yang dibuat sebelum active_until (bukan hanya dalam periode aktif)
             $existingAutoROCount = $user->userPins()
                 ->whereHas('pin', function($q) use ($pin) {
                     $q->where('name', $pin->name);
                 })
                 ->where('is_ro', true)
                 ->where('is_used', true)
-                ->whereBetween('created_at', [$activeFrom, Carbon::now()])
+                ->where('created_at', '<=', $activeUntil)
                 ->count();
             
             // Jika masih ada Auto RO yang belum dibuat, buat yang terlewat
