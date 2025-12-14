@@ -54,23 +54,10 @@
                                         Administrator
                                     @else
                                         @php
-                                            $userReward = Auth::user()
-                                                ->userRewards()
-                                                ->latest()
-                                                ->first();
+                                            $userRank = Auth::user()->userRank;
                                         @endphp
-                                        @if ($userReward)
-                                            @if ($userReward->reward->is_platinum)
-                                                BSM
-                                                @foreach ($platinumRewards as $a)
-                                                    <i class="mdi mdi-diamond text-info"></i>
-                                                @endforeach
-                                            @else
-                                                BSM
-                                                @foreach ($nonPlatinumRewards as $a)
-                                                    <i class="mdi mdi-star text-danger"></i>
-                                                @endforeach
-                                            @endif
+                                        @if ($userRank && $userRank->rank)
+                                            {{ $userRank->rank->rank }}
                                         @else
                                             -
                                         @endif
