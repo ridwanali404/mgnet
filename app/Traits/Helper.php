@@ -158,6 +158,7 @@ trait Helper
             }
             // Cek apakah ini pin RO (is_ro = true) untuk base pin Gold atau Platinum
             // Bonus Monoleg untuk RO base pin (jika ada bonus_monoleg)
+            // Semua Komisi Monoleg dari RO berasal dari Automaintain (ada yang Automaintain di bawahnya)
             $isRO = $userPin->is_ro ?? false;
             if ($isRO && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
                 $sponsor = $user->sponsor;
@@ -170,7 +171,7 @@ trait Helper
                             $bonus = $monoleg->bonuses()->create([
                                 'type' => 'Komisi Monoleg',
                                 'amount' => $amount,
-                                'description' => 'Komisi Monoleg dari RO ' . $pin->name . ' oleh ' . $user->username . '.',
+                                'description' => 'Komisi Monoleg dari RO Automaintain oleh ' . $user->username . '.',
                             ]);
                             Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                         }
