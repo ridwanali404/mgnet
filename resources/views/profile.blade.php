@@ -161,8 +161,7 @@
                             <label for="email" class="col-sm-3 text-right control-label col-form-label">Email</label>
                             <div class="col-sm-9">
                                 <input id="email" type="text" class="form-control" name="email"
-                                    value="{{ $user->email }}"
-                                    @if (Auth::user()->type != 'admin') disabled @else required @endif>
+                                    value="{{ $user->email }}" required>
                                 @if ($errors->has('email'))
                                     <span class="help-block">
                                         <strong>{{ $errors->first('email') }}</strong>
@@ -175,8 +174,7 @@
                                 <label for="password"
                                     class="col-sm-3 text-right control-label col-form-label">Password</label>
                                 <div class="col-sm-9">
-                                    <input id="password" type="text" class="form-control" name="password"
-                                        value="{{ old('password') }}" @if (Auth::user()->type != 'admin') disabled @endif>
+                                    <input id="password" type="text" class="form-control" name="password">
                                     @if ($errors->has('password'))
                                         <span class="help-block">
                                             <strong>{{ $errors->first('password') }}</strong>
