@@ -1281,6 +1281,7 @@ trait Helper
                     'wallet_cashback' => 0,
                     'daily_accumulation' => 0,
                 ]);
+                Helper::rank($user, $gpsSaving->wallet_cashback);
             }
             
             // Power Plus tetap dibuat terpisah (tidak dihapus atau digabung)
@@ -1399,6 +1400,7 @@ trait Helper
                             'created_at' => $month . '-01 00:00:00',
                             'updated_at' => $month . '-01 00:00:00',
                         ]);
+                        Helper::rank($qualification->user, $bonus15k);
                     }
                 });
         }
@@ -1430,6 +1432,7 @@ trait Helper
                             'created_at' => $month . '-01 00:00:00',
                             'updated_at' => $month . '-01 00:00:00',
                         ]);
+                        Helper::rank($qualification->user, $bonus30k);
                     }
                 });
         }

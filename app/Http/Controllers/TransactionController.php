@@ -328,11 +328,12 @@ class TransactionController extends Controller
         if ($username) {
             // cashback bonus to sponsor
             if ($user && $transaction->cashback && $transaction->type == 'general') {
-                $user->bonuses()->create([
+                $bonus = $user->bonuses()->create([
                     'type' => 'Komisi Penjualan',
                     'amount' => $transaction->cashback,
                     'description' => 'Komisi Penjualan dari belanja '.$username.' dengan rincian belanja '.$carts.'.',
                 ]);
+                Helper::rank($user, $bonus->amount);
             }
             
             // Cek dan perpanjang masa aktif jika belanja RO >= 1.7 juta (dalam masa aktif)

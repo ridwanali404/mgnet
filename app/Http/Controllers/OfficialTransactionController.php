@@ -162,11 +162,12 @@ class OfficialTransactionController extends Controller
         $sponsor = $user->sponsor;
         // cashback bonus to sponsor
         if ($user && $officialTransaction->cashback) {
-            $user->bonuses()->create([
+            $bonus = $user->bonuses()->create([
                 'type' => 'Komisi Penjualan',
                 'amount' => $officialTransaction->cashback,
                 'description' => 'Komisi Penjualan dari belanja ' . $officialTransaction->user->username . '.',
             ]);
+            Helper::rank($user, $bonus->amount);
         }
         // Bonus Unilevel RO (premium member)
         // ro bonus is generated on closing

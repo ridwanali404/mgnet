@@ -76,16 +76,9 @@ class UpdateAllRanks extends Command
                 
                 // Jika reset, hitung ulang cash_rank dari bonus
                 if ($reset) {
-                    // Hitung cash_rank dari bonus yang valid
-                    // Bonus yang menghasilkan cash_rank biasanya dari: Komisi Sponsor, Komisi Monoleg, Komisi Pasangan, Bonus Generasi
-                    $cashRank = Bonus::where('user_id', $user->id)
-                        ->whereIn('type', [
-                            'Komisi Sponsor',
-                            'Komisi Monoleg',
-                            'Komisi Pasangan',
-                            'Bonus Generasi'
-                        ])
-                        ->sum('amount');
+                    // Hitung cash_rank dari SEMUA bonus
+                    // Semua jenis bonus berkontribusi terhadap peningkatan rank
+                    $cashRank = Bonus::where('user_id', $user->id)->sum('amount');
                     
                     // Update cash_rank
                     $user->cash_rank = $cashRank;
@@ -157,14 +150,9 @@ class UpdateAllRanks extends Command
      */
     private function getRankAchievementDate($user, $targetNominal)
     {
-        // Ambil semua bonus yang menghasilkan cash_rank, urutkan berdasarkan tanggal
+        // Ambil SEMUA bonus, urutkan berdasarkan tanggal
+        // Semua jenis bonus berkontribusi terhadap peningkatan rank
         $bonuses = Bonus::where('user_id', $user->id)
-            ->whereIn('type', [
-                'Komisi Sponsor',
-                'Komisi Monoleg',
-                'Komisi Pasangan',
-                'Bonus Generasi'
-            ])
             ->orderBy('created_at', 'asc')
             ->get();
         
