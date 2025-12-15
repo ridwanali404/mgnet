@@ -82,6 +82,11 @@
                             <button class="btn btn-info btn-lg btn-block text-uppercase waves-effect waves-light" type="submit" name="loginButton">Log In</button>
                         </div>
                     </div>
+                    <div class="form-group m-b-0">
+                        <div class="col-sm-12 text-center">
+                            <a href="{{ url('/') }}" class="text-info m-l-5"><b>Back to Landing Page</b></a>
+                        </div>
+                    </div>
                 </form>
             </div>
         </div>
