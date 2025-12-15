@@ -49,41 +49,37 @@
     <!-- ============================================================== -->
     <div class="preloader">
         <svg class="circular" viewBox="25 25 50 50">
-            <circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2"
-                stroke-miterlimit="10" />
+            <circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10" />
         </svg>
     </div>
     <div class="centered">
         <div class="login-box card">
             <div class="card-body">
-                <form class="form-horizontal form-material" id="loginform" action="{{ url('login') }}" method="POST"
-                    onsubmit="loginButton.disabled = true;">
+                <form class="form-horizontal form-material" id="loginform" action="{{ url('login') }}" method="POST" onsubmit="loginButton.disabled = true;">
                     @csrf
                     <h3 class="box-title m-b-20">Sign In</h3>
                     <div class="form-group ">
                         <div class="col-xs-12">
-                            <input class="form-control" type="text" name="username" value="{{ old('username') }}"
-                                required="" placeholder="Username">
+                            <input class="form-control" type="text" name="username" value="{{ old('username') }}" required="" placeholder="Username">
                         </div>
                     </div>
                     <div class="form-group">
                         <div class="col-xs-12">
-                            <input class="form-control" type="password" name="password" required=""
-                                placeholder="Password">
+                            <input class="form-control" type="password" name="password" required="" placeholder="Password">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <div class="d-flex no-block align-items-center">
-                            <div class="checkbox checkbox-primary p-t-0">
-                                <input id="checkbox-signup" name="remember" type="checkbox">
-                                <label for="checkbox-signup"> Remember me </label>
-                            </div>
+                    <div class="d-flex no-block align-items-center">
+                        <div class="checkbox checkbox-primary p-t-0">
+                            <input id="checkbox-signup" name="remember" type="checkbox">
+                            <label for="checkbox-signup"> Remember me </label>
+                        </div>
+                        <div class="ml-auto">
+                            <a href="{{ route('password.request') }}" class="text-muted"><i class="fa fa-lock m-r-5"></i> Forgot pwd?</a>
                         </div>
                     </div>
                     <div class="form-group text-center m-t-20">
                         <div class="col-xs-12">
-                            <button class="btn btn-info btn-lg btn-block text-uppercase waves-effect waves-light"
-                                type="submit" name="loginButton">Log In</button>
+                            <button class="btn btn-info btn-lg btn-block text-uppercase waves-effect waves-light" type="submit" name="loginButton">Log In</button>
                         </div>
                     </div>
                 </form>
@@ -116,7 +112,7 @@
     <script src="{{ asset('material-pro/assets/plugins/toast-master/js/jquery.toast.js') }}"></script>
     @if (Session::has('success'))
         <script type="text/javascript">
-            $(function() {
+            $(function () {
                 'use strict'
                 $.toast({
                     heading: 'Berhasil',
@@ -129,7 +125,7 @@
     @endif
     @if (Session::has('fail'))
         <script type="text/javascript">
-            $(function() {
+            $(function () {
                 'use strict'
                 $.toast({
                     heading: 'Gagal',

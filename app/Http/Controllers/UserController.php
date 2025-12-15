@@ -20,7 +20,10 @@ use App\Models\UserPin;
 use App\Models\Province;
 
 use App\Models\Subdistrict;
+use App\Models\UserTrip;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Mail\WelcomeEmail;
 use App\Models\Imports\UserImport;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -85,7 +88,7 @@ class UserController extends Controller
         // Set upline_id: jika kosong, gunakan sponsor_id
         $sponsor_id = $r['sponsor_id'] ?? auth()->id();
         $upline_id = $r['upline_id'] ?? $sponsor_id;
-        
+
         $createdUser = User::create([
             'name' => $r['name'],
             'email' => $r['email'],
@@ -119,19 +122,10 @@ class UserController extends Controller
             ]);
         }
         Helper::upgrade($userPin);
-        if (env('APP_ENV') == 'production' && $r['is_clone'] == 'no') {
-            // send email
-            $to_name = $createdUser->name;
-            $to_email = $createdUser->email;
-            $data = array(
-                'user' => $createdUser,
-                'password' => $password,
-            );
-            Mail::send('mail.register', $data, function ($message) use ($to_name, $to_email) {
-                $message->to($to_email, $to_name)->subject('Registrasi');
-                $message->from('bsmcrid@gmail.com', 'MG Network');
-            });
-        }
+    if ($r['is_clone'] == 'no') {
+        // send email
+        Mail::to($createdUser->email)->send(new WelcomeEmail($createdUser, $password));
+    }
         Session::flash('success', 'Registrasi berhasil');
         return redirect('referral');
     }
@@ -208,17 +202,8 @@ class UserController extends Controller
 
             // send email
             $address = \App\Models\Address::find($request->address_id);
-            $to_name = $user->name;
-            $to_email = $user->email;
-            $data = array(
-                'user' => $user,
-                'password' => $request->password,
-            );
             if (env('MAIL_USERNAME')) {
-                Mail::send('mail.register', $data, function ($message) use ($to_name, $to_email) {
-                    $message->to($to_email, $to_name)->subject('Registrasi');
-                    $message->from('bsmcrid@gmail.com', 'MG Network');
-                });
+                Mail::to($user->email)->send(new WelcomeEmail($user, $request->password));
             }
 
             Session::flash('success', 'Registered');
@@ -266,7 +251,7 @@ class UserController extends Controller
             'username' => 'required|unique:users,username,' . $user->id,
         ]);
         $rr = $request->all();
-        
+
         // KRUSIAL: Lock data bank dan NPWP setelah registrasi
         // Hanya admin yang bisa mengubah data bank (bank_id, bank_account, bank_as) dan NPWP
         // Ini untuk mencegah upline mengubah data bank member setelah registrasi
@@ -277,7 +262,7 @@ class UserController extends Controller
             unset($rr['bank_as']);
             unset($rr['npwp']);
         }
-        
+
         if (!isset($rr['password']) || $rr['password'] == null || $rr['password'] == '') {
             unset($rr['password']);
         } else {
@@ -385,7 +370,7 @@ class UserController extends Controller
     public function filter()
     {
         $query = User::select('id', 'username as text')->whereIn('type', ['member', 'admin']);
-        
+
         // Jika ada sponsor_id, hanya tampilkan downline dari sponsor tersebut (Tree Sponsor)
         if (request()->has('sponsor_id') && request()->get('sponsor_id')) {
             $sponsor = User::find(request()->get('sponsor_id'));
@@ -397,7 +382,7 @@ class UserController extends Controller
                 $query->whereIn('id', $downlineIds);
             }
         }
-        
+
         // Jika ada upline_id, hanya tampilkan downline dari upline tersebut (Tree Upline)
         // Tree Upline menggunakan upline_id, bukan sponsor_id
         if (request()->has('upline_id') && request()->get('upline_id')) {
@@ -410,14 +395,14 @@ class UserController extends Controller
                 $query->whereIn('id', $downlineIds);
             }
         }
-        
+
         if (request()->has('search') && request()->get('search')) {
             $query->where('username', 'like', request()->get('search') . '%');
         }
-        
+
         return $query->paginate(10);
     }
-    
+
     /**
      * Get all descendants based on upline_id (Tree Upline)
      * Recursive function to get all downlines
@@ -426,11 +411,11 @@ class UserController extends Controller
     {
         $downlines = $user->uplines()->pluck('id')->toArray();
         $collected = array_merge($collected, $downlines);
-        
+
         foreach ($user->uplines()->get() as $downline) {
             $collected = $this->getUplineDescendants($downline, $collected);
         }
-        
+
         return $collected;
     }
 

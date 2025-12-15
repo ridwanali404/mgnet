@@ -67,6 +67,10 @@ Route::get('city/{province_id}', 'UserController@city');
 Route::get('subdistrict/{city_id}', 'UserController@subdistrict');
 
 // Auth::routes();
+Route::get('password/reset', 'Auth\ForgotPasswordController@showLinkRequestForm')->name('password.request');
+Route::post('password/email', 'Auth\ForgotPasswordController@sendResetLinkEmail')->name('password.email');
+Route::get('password/reset/{token}', 'Auth\ResetPasswordController@showResetForm')->name('password.reset');
+Route::post('password/reset', 'Auth\ResetPasswordController@reset')->name('password.update');
 
 Route::group(['middleware' => 'auth'], function () {
     Route::resource('a/dashboard', 'DashboardController');
@@ -86,14 +90,16 @@ Route::group(['middleware' => 'auth'], function () {
         Route::resource('a/about-us', 'AboutUsController');
         Route::resource('a/contact-us', 'ContactUsController');
         Route::resource('a/page', 'PageController');
-        Route::resource('a/user', 'UserController', ['names' => [
-            'create' => 'a.user.create',
-            'store' => 'a.user.store',
-            'show' => 'a.user.show',
-            'edit' => 'a.user.edit',
-            'update' => 'a.user.update',
-            'destroy' => 'a.user.destroy',
-        ]]);
+        Route::resource('a/user', 'UserController', [
+            'names' => [
+                'create' => 'a.user.create',
+                'store' => 'a.user.store',
+                'show' => 'a.user.show',
+                'edit' => 'a.user.edit',
+                'update' => 'a.user.update',
+                'destroy' => 'a.user.destroy',
+            ]
+        ]);
         Route::put('a/product/{product}/main/{key}', 'ProductController@imageMain')->name('product.image.main');
         Route::delete('a/product/{product}/main/{key}', 'ProductController@imageDelete')->name('product.image.delete');
         Route::get('users', 'UserController@users');

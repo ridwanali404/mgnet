@@ -88,7 +88,7 @@
                         </div>
 
                         <div class="col-12">
-                            <a href="{{ url('/') }}" class="float-end text-dark fw-light mt-2">Lupa
+                            <a href="{{ url('/password/reset') }}" class="float-end text-dark fw-light mt-2">Lupa
                                 Password?</a>
                         </div>
 
