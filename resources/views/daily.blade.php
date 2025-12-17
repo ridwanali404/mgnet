@@ -135,7 +135,7 @@
                                         $days_amount = $days->sum('amount');
                                         $total = $days_amount;
                                         $automaintain = round(0.1 * $total);
-                                        $tax = $automaintain >= 330000 ? ($tax = ($automaintain * ($a->npwp ? 5 : 6)) / 100) : 0;
+                                        $tax = $total >= 330000 ? ($tax = ($total * ($a->npwp ? 5 : 6)) / 100) : 0;
                                         $admin = $days_group->sum('admin');
                                         $total_transfer = $total - $automaintain - $tax - $admin;
                                     @endphp
@@ -294,7 +294,7 @@
                     $days_amount = $days->sum('amount');
                     $total = $days_amount;
                     $automaintain = round(0.1 * $total);
-                    $tax = $automaintain >= 330000 ? ($tax = ($automaintain * ($a->npwp ? 5 : 6)) / 100) : 0;
+                    $tax = $total >= 330000 ? ($tax = ($total * ($a->npwp ? 5 : 6)) / 100) : 0;
                     $admin = $days_group->sum('admin');
                     $total_transfer = $total - $automaintain - $tax - $admin;
                 @endphp
@@ -515,7 +515,7 @@
                 $days_amount = $days->sum('amount');
                 $total = $days_amount;
                 $automaintain = round(0.1 * $total);
-                $tax = $automaintain >= 330000 ? ($tax = ($automaintain * ($a->npwp ? 5 : 6)) / 100) : 0;
+                $tax = $total >= 330000 ? ($tax = ($total * ($a->npwp ? 5 : 6)) / 100) : 0;
                 $admin = $days_group->sum('admin');
                 $total_transfer = $total - $automaintain - $tax - $admin;
             @endphp
