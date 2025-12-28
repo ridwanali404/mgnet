@@ -28,28 +28,67 @@ class ReportOmsetController extends Controller
         $endDate = $request->end_date ?? date('Y-m-d');
         
         // Omset Harian - data dari penjualan pin harian
+        // FIX: Untuk AUTO RO (is_ro = true), gunakan ro_price (1.7 juta) bukan price penuh
         $omsetHarian = UserPin::whereDate('created_at', $date)
-            ->select(
-                DB::raw('DATE(created_at) as tanggal'),
-                DB::raw('SUM(price) as total_omset'),
-                DB::raw('COUNT(*) as jumlah_pin')
-            )
-            ->groupBy('tanggal')
+            ->with('pin')
+            ->get()
+            ->groupBy(function ($item) {
+                return $item->created_at->format('Y-m-d');
+            })
+            ->map(function ($group) {
+                $totalOmset = $group->sum(function ($userPin) {
+                    // Jika ini AUTO RO, gunakan ro_price atau default 1.7 juta
+                    if ($userPin->is_ro) {
+                        $roPrice = $userPin->pin->ro_price ?? 1700000;
+                        return $roPrice;
+                    }
+                    // Untuk pin normal, gunakan price
+                    return $userPin->price;
+                });
+                return (object) [
+                    'tanggal' => $group->first()->created_at->format('Y-m-d'),
+                    'total_omset' => $totalOmset,
+                    'jumlah_pin' => $group->count(),
+                ];
+            })
             ->first();
         
         // Omset Harian per hari dalam range
         $omsetHarianRange = UserPin::whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
-            ->select(
-                DB::raw('DATE(created_at) as tanggal'),
-                DB::raw('SUM(price) as total_omset'),
-                DB::raw('COUNT(*) as jumlah_pin')
-            )
-            ->groupBy('tanggal')
-            ->orderBy('tanggal', 'desc')
-            ->get();
+            ->with('pin')
+            ->get()
+            ->groupBy(function ($item) {
+                return $item->created_at->format('Y-m-d');
+            })
+            ->map(function ($group) {
+                $totalOmset = $group->sum(function ($userPin) {
+                    // Jika ini AUTO RO, gunakan ro_price atau default 1.7 juta
+                    if ($userPin->is_ro) {
+                        $roPrice = $userPin->pin->ro_price ?? 1700000;
+                        return $roPrice;
+                    }
+                    // Untuk pin normal, gunakan price
+                    return $userPin->price;
+                });
+                return (object) [
+                    'tanggal' => $group->first()->created_at->format('Y-m-d'),
+                    'total_omset' => $totalOmset,
+                    'jumlah_pin' => $group->count(),
+                ];
+            })
+            ->sortByDesc('tanggal')
+            ->values();
         
         // Total omset semua
-        $totalOmsetSemua = UserPin::sum('price');
+        $totalOmsetSemua = UserPin::with('pin')->get()->sum(function ($userPin) {
+            // Jika ini AUTO RO, gunakan ro_price atau default 1.7 juta
+            if ($userPin->is_ro) {
+                $roPrice = $userPin->pin->ro_price ?? 1700000;
+                return $roPrice;
+            }
+            // Untuk pin normal, gunakan price
+            return $userPin->price;
+        });
         
         // Total Bonus Harian
         $totalBonusHarian = Bonus::whereDate('created_at', $date)
@@ -86,6 +125,56 @@ class ReportOmsetController extends Controller
             'totalBonusHarianRange',
             'totalBonusSemua'
         ));
+    }
+    
+    /**
+     * Get omset breakdown for a specific date
+     * Menampilkan breakdown HASIL PENJUALAN vs HASIL AUTO RO
+     */
+    public function getOmsetBreakdown(Request $request)
+    {
+        $date = $request->date ?? date('Y-m-d');
+        
+        // Ambil semua user pin untuk tanggal tersebut
+        $userPins = UserPin::whereDate('created_at', $date)
+            ->with(['user', 'pin'])
+            ->get();
+        
+        // Pisahkan HASIL PENJUALAN dan HASIL AUTO RO
+        $hasilPenjualan = [];
+        $hasilAutoRO = [];
+        $totalPenjualan = 0;
+        $totalAutoRO = 0;
+        
+        foreach ($userPins as $userPin) {
+            if ($userPin->is_ro) {
+                // HASIL AUTO RO
+                $roPrice = $userPin->pin->ro_price ?? 1700000;
+                $hasilAutoRO[] = [
+                    'username' => $userPin->user->username ?? '-',
+                    'pin_name' => $userPin->pin->name ?? '-',
+                    'amount' => $roPrice,
+                ];
+                $totalAutoRO += $roPrice;
+            } else {
+                // HASIL PENJUALAN
+                $hasilPenjualan[] = [
+                    'username' => $userPin->user->username ?? '-',
+                    'pin_name' => $userPin->pin->name ?? '-',
+                    'amount' => $userPin->price,
+                ];
+                $totalPenjualan += $userPin->price;
+            }
+        }
+        
+        return response()->json([
+            'date' => $date,
+            'hasil_penjualan' => $hasilPenjualan,
+            'hasil_auto_ro' => $hasilAutoRO,
+            'total_penjualan' => $totalPenjualan,
+            'total_auto_ro' => $totalAutoRO,
+            'total_omset' => $totalPenjualan + $totalAutoRO,
+        ]);
     }
 }
 

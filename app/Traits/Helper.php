@@ -159,23 +159,19 @@ trait Helper
             // Cek apakah ini pin RO (is_ro = true) untuk base pin Gold atau Platinum
             // Bonus Monoleg untuk RO base pin (jika ada bonus_monoleg)
             // Semua Komisi Monoleg dari RO berasal dari Automaintain (ada yang Automaintain di bawahnya)
+            // FIX: Semua AUTO RO menggunakan harga Gold (1.7 juta) bukan harga pin asli
             $isRO = $userPin->is_ro ?? false;
             if ($isRO && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
                 $sponsor = $user->sponsor;
                 // Syarat: sponsor harus memiliki minimal 1 downline langsung
                 if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
-                    $monoleg = Helper::findMonolegRecursive($sponsor, $user);
-                    if ($monoleg) {
-                        $amount = round($pin->ro_price * $pin->monoleg_percent / 100);
-                        if ($amount > 0) {
-                            $bonus = $monoleg->bonuses()->create([
-                                'type' => 'Komisi Monoleg',
-                                'amount' => $amount,
-                                'description' => 'Komisi Monoleg dari RO Automaintain oleh ' . $user->username . '.',
-                            ]);
-                            Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
-                        }
-                    }
+                    // FIX: Gunakan harga Gold untuk semua AUTO RO (1.7 juta)
+                    $goldPin = Pin::where('name', 'Gold')->where('type', 'premium')->first();
+                    $roPrice = $goldPin->ro_price ?? 1700000; // Default 1.7 juta untuk Gold
+                    $monolegPercent = $goldPin->monoleg_percent ?? 9; // Default 9% untuk Gold
+                    
+                    // Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst)
+                    Helper::calculateMonolegBonusRecursive($sponsor, $user, $roPrice, $monolegPercent, 'RO Automaintain');
                 }
             }
         }
@@ -416,26 +412,16 @@ trait Helper
         }
 
         // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM dan bukan RO) - DIBUAT HARIAN (dibayar langsung saat upgrade)
+        // FIX: Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst)
         // $isRO sudah didefinisikan di atas
         if (!$isRO && !str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
             $sponsor = $user->sponsor;
             // Syarat: sponsor harus memiliki minimal 1 downline langsung (berdasarkan upline_id)
             if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
-                // Cari monoleg (jalur monoleg, bukan Leg Kiri) - unlimited depth
-                // Leg Kiri tidak dihitung sebagai monoleg, hanya Leg 1, Leg 2, dst
-                $monoleg = Helper::findMonolegRecursive($sponsor, $user);
-                if ($monoleg) {
-                    $amount = round($pin->price * $pin->monoleg_percent / 100);
-                    if ($amount > 0) {
-                        $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
-                        $bonus = $monoleg->bonuses()->create([
-                            'type' => 'Komisi Monoleg',
-                            'amount' => $amount,
-                            'description' => 'Bonus Monoleg 9% dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.',
-                        ]);
-                        Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
-                    }
-                }
+                $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
+                $description = 'Bonus Monoleg 9% dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.';
+                // Hitung bonus monoleg secara recursive untuk semua level
+                Helper::calculateMonolegBonusRecursive($sponsor, $user, $pin->price, $pin->monoleg_percent, $description);
             }
         }
 
@@ -710,6 +696,78 @@ trait Helper
         return null;
     }
 
+    /**
+     * Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst)
+     * Bonus monoleg diberikan ke semua upline di jalur monoleg yang memenuhi syarat
+     * 
+     * @param User $sponsor Sponsor dari user yang melakukan upgrade/RO
+     * @param User $currentUser User yang melakukan upgrade/RO
+     * @param int $basePrice Harga dasar untuk perhitungan bonus (price untuk join/upgrade, ro_price untuk RO)
+     * @param float $monolegPercent Persentase bonus monoleg (biasanya 9%)
+     * @param string $descriptionTemplate Template deskripsi bonus (akan ditambahkan level)
+     */
+    public static function calculateMonolegBonusRecursive($sponsor, $currentUser, $basePrice, $monolegPercent, $descriptionTemplate)
+    {
+        if (!$sponsor || !$currentUser) {
+            return;
+        }
+
+        $level = 1;
+        $currentSponsor = $sponsor;
+        $currentUserForMonoleg = $currentUser;
+        
+        // Loop untuk mencari semua monoleg di jalur ke atas (level 1, 2, 3, dst)
+        while ($currentSponsor) {
+            // Cek apakah currentSponsor memiliki minimal 1 downline langsung
+            if ($currentSponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
+                // Cari monoleg di level ini
+                $monoleg = Helper::findMonolegRecursive($currentSponsor, $currentUserForMonoleg);
+                
+                if ($monoleg && $monoleg->premiumUserPin) {
+                    // Hitung amount bonus
+                    $amount = round($basePrice * $monolegPercent / 100);
+                    
+                    if ($amount > 0) {
+                        // Buat deskripsi dengan level
+                        $description = $descriptionTemplate;
+                        if ($level > 1) {
+                            $description .= ' (Level ' . $level . ')';
+                        }
+                        
+                        // Buat bonus
+                        $bonus = $monoleg->bonuses()->create([
+                            'type' => 'Komisi Monoleg',
+                            'amount' => $amount,
+                            'description' => $description,
+                        ]);
+                        
+                        Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
+                    }
+                    
+                    // Lanjutkan ke level berikutnya
+                    // Untuk level berikutnya, kita perlu mencari monoleg dari monoleg yang baru saja mendapat bonus
+                    // Current user untuk level berikutnya adalah monoleg yang baru saja mendapat bonus
+                    // Current sponsor untuk level berikutnya adalah sponsor dari monoleg tersebut
+                    // Catatan: Untuk level 2+, kita mencari monoleg dari monoleg level sebelumnya
+                    $currentUserForMonoleg = $monoleg;
+                    $currentSponsor = $monoleg->sponsor;
+                    $level++;
+                } else {
+                    // Tidak ada monoleg lagi, stop
+                    break;
+                }
+            } else {
+                // Sponsor tidak memenuhi syarat, stop
+                break;
+            }
+            
+            // Safety check: maksimal 10 level untuk mencegah infinite loop
+            if ($level > 10) {
+                break;
+            }
+        }
+    }
+
     public static function transactionUsers(DateTime $date)
     {
         $t_users = Transaction::whereYear('created_at', $date->format('Y'))->whereMonth('created_at', $date->format('m'))
@@ -740,11 +798,22 @@ trait Helper
         
         // Hitung dari penggunaan PIN (pembelian PIN bulanan)
         // Termasuk: Semua PIN terjual, Upgrade, dan Automaintain/autoRO
+        // FIX: Untuk AUTO RO (is_ro = true), gunakan ro_price (1.7 juta) bukan price penuh
         // Automaintain sudah membuat UserPin, jadi semua UserPin yang dibuat harus dihitung
         // Convert price (rupiah) ke poin (1 poin = 1000 rupiah)
         $pinOmzet = UserPin::whereYear('created_at', $year)
             ->whereMonth('created_at', $month)
-            ->sum('price');
+            ->with('pin')
+            ->get()
+            ->sum(function ($userPin) {
+                // Jika ini AUTO RO, gunakan ro_price atau default 1.7 juta
+                if ($userPin->is_ro) {
+                    $roPrice = $userPin->pin->ro_price ?? 1700000;
+                    return $roPrice;
+                }
+                // Untuk pin normal, gunakan price
+                return $userPin->price;
+            });
         $pinPoin = $pinOmzet / 1000;
         
         if (KeyValue::where('key', 'poin')->value('value') == 'enable') {
@@ -786,10 +855,20 @@ trait Helper
         
         // Hitung dari penggunaan PIN (pembelian PIN harian)
         // Termasuk: Semua PIN terjual, Upgrade, dan Automaintain/autoRO
+        // FIX: Untuk AUTO RO (is_ro = true), gunakan ro_price (1.7 juta) bukan price penuh
         // Automaintain sudah membuat UserPin, jadi semua UserPin yang dibuat harus dihitung
         // Convert price (rupiah) ke poin (1 poin = 1000 rupiah)
         $pinOmzet = UserPin::whereDate('created_at', $dateStr)
-            ->sum('price');
+            ->get()
+            ->sum(function ($userPin) {
+                // Jika ini AUTO RO, gunakan ro_price atau default 1.7 juta
+                if ($userPin->is_ro) {
+                    $roPrice = $userPin->pin->ro_price ?? 1700000;
+                    return $roPrice;
+                }
+                // Untuk pin normal, gunakan price
+                return $userPin->price;
+            });
         $pinPoin = $pinOmzet / 1000;
         
         // Cek apakah menggunakan Poin model

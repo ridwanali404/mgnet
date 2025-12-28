@@ -204,6 +204,7 @@ Route::group(['middleware' => ['auth']], function () {
         Route::get('admin', 'UserController@admin');
         Route::post('admin', 'UserController@adminStore')->name('admin.store');
         Route::get('report-omset', 'ReportOmsetController@index')->name('report-omset.index');
+        Route::get('report-omset/breakdown', 'ReportOmsetController@getOmsetBreakdown')->name('report-omset.breakdown');
         Route::get('admin-global-profit-sharing', 'AdminGlobalProfitSharingController@index')->name('admin-global-profit-sharing.index');
         Route::get('admin-global-profit-sharing/detail', 'AdminGlobalProfitSharingController@detail')->name('admin-global-profit-sharing.detail');
         Route::put('admin/{user}', 'UserController@adminUpdate')->name('admin.update');
@@ -215,6 +216,7 @@ Route::group(['middleware' => ['auth']], function () {
         Route::get('poin/disable', 'PoinController@disable')->name('poin.disable');
         Route::resource('poin', 'PoinController');
         Route::get('report-omset', 'ReportOmsetController@index')->name('report-omset.index');
+        Route::get('report-omset/breakdown', 'ReportOmsetController@getOmsetBreakdown')->name('report-omset.breakdown');
         Route::get('qualified/royalty', 'HomeController@royalty');
         Route::get('qualified', 'HomeController@qualified');
         Route::get('daily/pair', 'DailyProfitController@pair');

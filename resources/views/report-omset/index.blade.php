@@ -138,7 +138,11 @@
                                         @endphp
                                         <tr>
                                             <td>{{ $counter++ }}</td>
-                                            <td>{{ \Carbon\Carbon::createFromFormat('Y-m-d', $omset->tanggal)->translatedFormat('d F Y') }}</td>
+                                            <td>
+                                                <a href="javascript:void(0)" class="omset-detail-link" data-date="{{ $omset->tanggal }}">
+                                                    {{ \Carbon\Carbon::createFromFormat('Y-m-d', $omset->tanggal)->translatedFormat('d F Y') }}
+                                                </a>
+                                            </td>
                                             <td class="text-right">{{ number_format($omset->jumlah_pin, 0, ',', '.') }}</td>
                                             <td class="text-right">{{ number_format($omset->total_omset, 0, ',', '.') }}</td>
                                         </tr>
@@ -228,6 +232,89 @@
             </div>
         </div>
     </div>
+    
+    <!-- Modal untuk Detail Omset -->
+    <div class="modal fade" id="omsetDetailModal" tabindex="-1" role="dialog" aria-labelledby="omsetDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="omsetDetailModalLabel">Detail Omset</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="omset-detail-loading" class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                    </div>
+                    <div id="omset-detail-content" style="display: none;">
+                        <h6 class="mb-3">Tanggal: <span id="detail-date"></span></h6>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="card border-success">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-success">HASIL PENJUALAN</h5>
+                                        <h4 class="text-success" id="total-penjualan">Rp 0</h4>
+                                        <p class="text-muted mb-0" id="count-penjualan">0 pin</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-info">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-info">HASIL AUTO RO</h5>
+                                        <h4 class="text-info" id="total-auto-ro">Rp 0</h4>
+                                        <p class="text-muted mb-0" id="count-auto-ro">0 pin</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Detail Hasil Penjualan:</h6>
+                                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                    <table class="table table-sm table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Username</th>
+                                                <th>Paket</th>
+                                                <th class="text-right">Jumlah</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="penjualan-detail">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Detail Hasil AUTO RO:</h6>
+                                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                    <table class="table table-sm table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Username</th>
+                                                <th>Paket</th>
+                                                <th class="text-right">Jumlah</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="auto-ro-detail">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('script')
@@ -250,6 +337,83 @@
                     "url": "https://cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
                 }
             });
+            
+            // Handle click on omset detail link
+            $(document).on('click', '.omset-detail-link', function(e) {
+                e.preventDefault();
+                var date = $(this).data('date');
+                $('#omsetDetailModal').modal('show');
+                loadOmsetDetail(date);
+            });
+            
+            function loadOmsetDetail(date) {
+                $('#omset-detail-loading').show();
+                $('#omset-detail-content').hide();
+                
+                $.ajax({
+                    url: '{{ url("report-omset/breakdown") }}',
+                    method: 'GET',
+                    data: { date: date },
+                    success: function(response) {
+                        $('#omset-detail-loading').hide();
+                        $('#omset-detail-content').show();
+                        
+                        // Set date
+                        var dateObj = new Date(response.date);
+                        var formattedDate = dateObj.toLocaleDateString('id-ID', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        });
+                        $('#detail-date').text(formattedDate);
+                        
+                        // Set totals
+                        $('#total-penjualan').text('Rp ' + formatNumber(response.total_penjualan));
+                        $('#total-auto-ro').text('Rp ' + formatNumber(response.total_auto_ro));
+                        $('#count-penjualan').text(response.hasil_penjualan.length + ' pin');
+                        $('#count-auto-ro').text(response.hasil_auto_ro.length + ' pin');
+                        
+                        // Set detail penjualan
+                        var penjualanHtml = '';
+                        if (response.hasil_penjualan.length > 0) {
+                            response.hasil_penjualan.forEach(function(item) {
+                                penjualanHtml += '<tr>' +
+                                    '<td>' + item.username + '</td>' +
+                                    '<td>' + item.pin_name + '</td>' +
+                                    '<td class="text-right">Rp ' + formatNumber(item.amount) + '</td>' +
+                                    '</tr>';
+                            });
+                        } else {
+                            penjualanHtml = '<tr><td colspan="3" class="text-center text-muted">Tidak ada data</td></tr>';
+                        }
+                        $('#penjualan-detail').html(penjualanHtml);
+                        
+                        // Set detail auto RO
+                        var autoROHtml = '';
+                        if (response.hasil_auto_ro.length > 0) {
+                            response.hasil_auto_ro.forEach(function(item) {
+                                autoROHtml += '<tr>' +
+                                    '<td>' + item.username + '</td>' +
+                                    '<td>' + item.pin_name + '</td>' +
+                                    '<td class="text-right">Rp ' + formatNumber(item.amount) + '</td>' +
+                                    '</tr>';
+                            });
+                        } else {
+                            autoROHtml = '<tr><td colspan="3" class="text-center text-muted">Tidak ada data</td></tr>';
+                        }
+                        $('#auto-ro-detail').html(autoROHtml);
+                    },
+                    error: function() {
+                        $('#omset-detail-loading').hide();
+                        alert('Terjadi kesalahan saat memuat data detail omset.');
+                    }
+                });
+            }
+            
+            function formatNumber(num) {
+                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            }
         });
     </script>
 @endsection
