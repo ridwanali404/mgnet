@@ -27,9 +27,24 @@ class ReportOmsetController extends Controller
         $startDate = $request->start_date ?? date('Y-m-01');
         $endDate = $request->end_date ?? date('Y-m-d');
         
+        // Filter: hanya hitung data mulai dari hari ini (30 Januari 2026)
+        $today = Carbon::parse('2026-01-30');
+        $selectedDate = Carbon::parse($date);
+        
         // Omset Harian - data dari penjualan pin harian
         // FIX: Untuk AUTO RO (is_ro = true), gunakan ro_price (1.7 juta) bukan price penuh
-        $omsetHarian = UserPin::whereDate('created_at', $date)
+        // Hanya hitung data mulai dari hari ini
+        $omsetHarianQuery = UserPin::whereDate('created_at', $date);
+        
+        // Jika tanggal yang dipilih adalah hari ini atau setelahnya, filter mulai dari hari ini
+        if ($selectedDate->gte($today)) {
+            $omsetHarianQuery->where('created_at', '>=', $today->startOfDay());
+        } else {
+            // Jika tanggal sebelum hari ini, tidak ada data yang ditampilkan
+            $omsetHarianQuery->whereRaw('1 = 0'); // Always false condition
+        }
+        
+        $omsetHarian = $omsetHarianQuery
             ->with('pin')
             ->get()
             ->groupBy(function ($item) {
@@ -54,7 +69,10 @@ class ReportOmsetController extends Controller
             ->first();
         
         // Omset Harian per hari dalam range
-        $omsetHarianRange = UserPin::whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
+        // Hanya hitung data mulai dari hari ini
+        $actualStartDate = Carbon::parse($startDate)->lt($today) ? $today->format('Y-m-d') : $startDate;
+        $omsetHarianRange = UserPin::whereBetween('created_at', [$actualStartDate . ' 00:00:00', $endDate . ' 23:59:59'])
+            ->where('created_at', '>=', $today->startOfDay())
             ->with('pin')
             ->get()
             ->groupBy(function ($item) {
@@ -80,7 +98,11 @@ class ReportOmsetController extends Controller
             ->values();
         
         // Total omset semua
-        $totalOmsetSemua = UserPin::with('pin')->get()->sum(function ($userPin) {
+        // Hanya hitung data mulai dari hari ini
+        $totalOmsetSemua = UserPin::where('created_at', '>=', $today->startOfDay())
+            ->with('pin')
+            ->get()
+            ->sum(function ($userPin) {
             // Jika ini AUTO RO, gunakan ro_price atau default 1.7 juta
             if ($userPin->is_ro) {
                 $roPrice = $userPin->pin->ro_price ?? 1700000;
@@ -91,7 +113,18 @@ class ReportOmsetController extends Controller
         });
         
         // Total Bonus Harian
-        $totalBonusHarian = Bonus::whereDate('created_at', $date)
+        // Hanya hitung data mulai dari hari ini
+        $totalBonusHarianQuery = Bonus::whereDate('created_at', $date);
+        
+        // Jika tanggal yang dipilih adalah hari ini atau setelahnya, filter mulai dari hari ini
+        if ($selectedDate->gte($today)) {
+            $totalBonusHarianQuery->where('created_at', '>=', $today->startOfDay());
+        } else {
+            // Jika tanggal sebelum hari ini, tidak ada data yang ditampilkan
+            $totalBonusHarianQuery->whereRaw('1 = 0'); // Always false condition
+        }
+        
+        $totalBonusHarian = $totalBonusHarianQuery
             ->select(
                 DB::raw('DATE(created_at) as tanggal'),
                 DB::raw('SUM(amount) as total_bonus'),
@@ -101,7 +134,9 @@ class ReportOmsetController extends Controller
             ->first();
         
         // Total Bonus Harian per hari dalam range
-        $totalBonusHarianRange = Bonus::whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
+        // Hanya hitung data mulai dari hari ini
+        $totalBonusHarianRange = Bonus::whereBetween('created_at', [$actualStartDate . ' 00:00:00', $endDate . ' 23:59:59'])
+            ->where('created_at', '>=', $today->startOfDay())
             ->select(
                 DB::raw('DATE(created_at) as tanggal'),
                 DB::raw('SUM(amount) as total_bonus'),
@@ -112,7 +147,9 @@ class ReportOmsetController extends Controller
             ->get();
         
         // Total bonus semua
-        $totalBonusSemua = Bonus::sum('amount');
+        // Hanya hitung data mulai dari hari ini
+        $totalBonusSemua = Bonus::where('created_at', '>=', $today->startOfDay())
+            ->sum('amount');
         
         return view('report-omset.index', compact(
             'date',
@@ -123,7 +160,8 @@ class ReportOmsetController extends Controller
             'totalOmsetSemua',
             'totalBonusHarian',
             'totalBonusHarianRange',
-            'totalBonusSemua'
+            'totalBonusSemua',
+            'today'
         ));
     }
     
@@ -135,8 +173,23 @@ class ReportOmsetController extends Controller
     {
         $date = $request->date ?? date('Y-m-d');
         
+        // Filter: hanya hitung data mulai dari hari ini (30 Januari 2026)
+        $today = Carbon::parse('2026-01-30');
+        $selectedDate = Carbon::parse($date);
+        
         // Ambil semua user pin untuk tanggal tersebut
-        $userPins = UserPin::whereDate('created_at', $date)
+        // Hanya hitung data mulai dari hari ini
+        $userPinsQuery = UserPin::whereDate('created_at', $date);
+        
+        // Jika tanggal yang dipilih adalah hari ini atau setelahnya, filter mulai dari hari ini
+        if ($selectedDate->gte($today)) {
+            $userPinsQuery->where('created_at', '>=', $today->startOfDay());
+        } else {
+            // Jika tanggal sebelum hari ini, tidak ada data yang ditampilkan
+            $userPinsQuery->whereRaw('1 = 0'); // Always false condition
+        }
+        
+        $userPins = $userPinsQuery
             ->with(['user', 'pin'])
             ->get();
         
