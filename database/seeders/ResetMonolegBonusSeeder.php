@@ -34,7 +34,7 @@ class ResetMonolegBonusSeeder extends Seeder
             if (!$user) {
                 continue;
             }
-            $amount = (int) round(0.1 * $bonus->amount);
+            $amount = (int) round(0.07 * $bonus->amount);
             if ($amount <= 0) {
                 continue;
             }

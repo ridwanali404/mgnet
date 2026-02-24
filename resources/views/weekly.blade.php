@@ -98,7 +98,7 @@
                                         $weeks_count = $weeks_group->count();
                                         $weeks_amount = $weeks->sum('amount');
                                         $total = $weeks_amount;
-                                        $automaintain = round(0.1 * $total);
+                                        $automaintain = round(0.07 * $total);
                                         $tax = $total >= 330000 ? ($tax = ($total * ($a->npwp ? 5 : 6)) / 100) : 0;
                                         $admin = $weeks_group->sum('admin');
                                         $total_transfer = $total - $automaintain - $tax - $admin;
@@ -286,7 +286,7 @@
                     $weeks_count = $weeks_group->count();
                     $weeks_amount = $weeks->sum('amount');
                     $total = $weeks_amount;
-                    $automaintain = round(0.1 * $total);
+                    $automaintain = round(0.07 * $total);
                     $tax = $total >= 330000 ? ($tax = ($total * ($a->npwp ? 5 : 6)) / 100) : 0;
                     $admin = $weeks_group->sum('admin');
                     $total_transfer = $total - $automaintain - $tax - $admin;
@@ -450,7 +450,7 @@
                     $weeks_count = $weeks_group->count();
                     $weeks_amount = $weeks->sum('amount');
                     $total = $weeks_amount;
-                    $automaintain = round(0.1 * $total);
+                    $automaintain = round(0.07 * $total);
                     $tax = $total >= 330000 ? ($tax = ($total * ($a->npwp ? 5 : 6)) / 100) : 0;
                     $admin = $weeks_group->sum('admin');
                     $total_transfer = $total - $automaintain - $tax - $admin;

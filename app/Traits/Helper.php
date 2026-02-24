@@ -1198,7 +1198,7 @@ trait Helper
     public static function automaintain($user, $type, $gross, $description)
     {
         Helper::rank($user, $gross);
-        $amount = round(0.1 * $gross);
+        $amount = round(0.07 * $gross);
         match ($type) {
             'K' => $user->increment('cash_automaintain', $amount),
             'D' => $user->decrement('cash_automaintain', $amount),

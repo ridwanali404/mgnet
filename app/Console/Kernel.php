@@ -60,6 +60,15 @@ class Kernel extends ConsoleKernel
             Log::info('Global Profit Sharing calculated: ' . date('Y-m-d'));
         })->dailyAt('23:50');
 
+        // Power Plus: hitung per bulan, reset setiap bulan (hanya omset bulan berjalan)
+        // Jalankan tiap hari agar data "bulan ini" selalu terupdate dari daily_poins bulan ini saja
+        $schedule->call(function () {
+            ini_set('max_execution_time', '-1');
+            ini_set('memory_limit', '-1');
+            Helper::calculatePowerPlus(date('Y-m'));
+            Log::info('Power Plus calculated for month: ' . date('Y-m'));
+        })->dailyAt('00:15');
+
         // Backups (to Google Drive)
         $schedule->command('backup:clean')->dailyAt('01:30');
         $schedule->command('backup:run --only-to-disk=google')->dailyAt('01:35');
