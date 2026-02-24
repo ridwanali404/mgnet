@@ -162,16 +162,13 @@ trait Helper
             // FIX: Semua AUTO RO menggunakan harga Gold (1.7 juta) bukan harga pin asli
             $isRO = $userPin->is_ro ?? false;
             if ($isRO && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
-                $sponsor = $user->sponsor;
-                // Syarat: sponsor harus memiliki minimal 1 downline langsung
-                if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
-                    // FIX: Gunakan harga Gold untuk semua AUTO RO (1.7 juta)
+                $firstUpline = $user->upline ?? $user->sponsor;
+                if ($firstUpline && $firstUpline->uplines()->whereHas('premiumUserPin')->count() >= 1) {
                     $goldPin = Pin::where('name', 'Gold')->where('type', 'premium')->first();
-                    $roPrice = $goldPin->ro_price ?? 1700000; // Default 1.7 juta untuk Gold
-                    $monolegPercent = $goldPin->monoleg_percent ?? 9; // Default 9% untuk Gold
-                    
-                    // Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst)
-                    Helper::calculateMonolegBonusRecursive($sponsor, $user, $roPrice, $monolegPercent, 'RO Automaintain');
+                    $roPrice = $goldPin->ro_price ?? 1700000;
+                    $monolegPercent = $goldPin->monoleg_percent ?? 9;
+                    $pinOccurredAt = $userPin->updated_at ?? $userPin->created_at;
+                    Helper::calculateMonolegBonusRecursive($firstUpline, $user, $roPrice, $monolegPercent, 'RO Automaintain', $pinOccurredAt);
                 }
             }
         }
@@ -412,16 +409,14 @@ trait Helper
         }
 
         // Bonus Monoleg 9% untuk Gold & Platinum (bukan BSM dan bukan RO) - DIBUAT HARIAN (dibayar langsung saat upgrade)
-        // FIX: Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst)
-        // $isRO sudah didefinisikan di atas
+        // Jalur monoleg ikut tree upline_id; mulai dari upline joiner (bukan sponsor) agar sama dengan tampilan tree
         if (!$isRO && !str_contains($pin->name, 'BSM') && in_array($pin->name, ['Gold', 'Platinum']) && $pin->monoleg_percent > 0) {
-            $sponsor = $user->sponsor;
-            // Syarat: sponsor harus memiliki minimal 1 downline langsung (berdasarkan upline_id)
-            if ($sponsor && $sponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
+            $firstUpline = $user->upline ?? $user->sponsor;
+            if ($firstUpline && $firstUpline->uplines()->whereHas('premiumUserPin')->count() >= 1) {
                 $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
-                $description = 'Bonus Monoleg 9% dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.';
-                // Hitung bonus monoleg secara recursive untuk semua level
-                Helper::calculateMonolegBonusRecursive($sponsor, $user, $pin->price, $pin->monoleg_percent, $description);
+                $descriptionTemplate = 'Bonus Monoleg 9%% dari ' . $action . ' %s paket ' . $pin->name . '.';
+                $pinOccurredAt = $userPin->updated_at ?? $userPin->created_at;
+                Helper::calculateMonolegBonusRecursive($firstUpline, $user, $pin->price, $pin->monoleg_percent, $descriptionTemplate, $pinOccurredAt);
             }
         }
 
@@ -656,57 +651,105 @@ trait Helper
     }
 
     /**
-     * Mencari monoleg (jalur monoleg) secara recursive untuk bonus monoleg
-     * Menggunakan uplines (berdasarkan upline_id) bukan sponsors (berdasarkan sponsor_id)
-     * Jalur monoleg = downline kedua dan seterusnya (bukan downline pertama/Leg Kiri)
-     * Bonus monoleg diberikan ke upline yang memiliki jalur monoleg
-     * Leg Kiri tidak dihitung sebagai monoleg, hanya Leg 1, Leg 2, dst
-     * 
-     * Catatan: Bonus monoleg hanya untuk downline langsung dari jalur monoleg,
-     * bukan untuk downline dari downline tersebut (hanya 1 level)
+     * Ambil member pertama langsung (Leg Kiri / downline pertama) dari user yang punya premium pin.
+     * Digunakan untuk deskripsi bonus monoleg level > 1 (harus pakai member pertama langsung, bukan member ke-2).
+     */
+    public static function getFirstDirectDownlineWithPremium($user)
+    {
+        if (!$user) {
+            return null;
+        }
+        return $user->uplines()
+            ->whereHas('premiumUserPin')
+            ->orderBy('created_at', 'asc')
+            ->first();
+    }
+
+    /**
+     * Kedalaman (level) dari penerima bonus ke joiner di tree: hitung langkah naik dari joiner ke penerima.
+     * Dipakai untuk keterangan level di deskripsi bonus monoleg (Level 1, 2, 3 = kedalaman dari POV penerima).
+     */
+    public static function monolegDepthFromRecipientToJoiner($recipient, $joiner)
+    {
+        if (!$recipient || !$joiner) {
+            return 1;
+        }
+        $depth = 0;
+        $current = $joiner;
+        while ($current) {
+            if ($current->id == $recipient->id) {
+                return $depth;
+            }
+            $depth++;
+            $current = $current->upline;
+        }
+        return $depth;
+    }
+
+    /**
+     * Cek apakah user berada di bawah (sama dengan atau descendant dari) leg, tanpa melewati sponsor.
+     * Dipakai agar jalur bonus monoleg mengikuti tree: source level > 1 = member pertama di bawah Leg.
+     */
+    public static function isUserUnderLeg($user, $leg, $sponsor)
+    {
+        $current = $user;
+        while ($current) {
+            if ($current->id == $leg->id) {
+                return true;
+            }
+            if ($current->id == $sponsor->id) {
+                return false;
+            }
+            $current = $current->upline;
+        }
+        return false;
+    }
+
+    /**
+     * Mencari monoleg (jalur monoleg) untuk bonus monoleg.
+     * Menggunakan uplines (upline_id). Jalur monoleg = Leg 1, Leg 2, dst (bukan Leg Kiri).
+     * currentUser boleh direct downline dari sponsor di jalur monoleg ATAU descendant di bawah salah satu Leg
+     * (persis seperti tree: Level 2 = member pertama di bawah Leg 1, dst).
      */
     public static function findMonolegRecursive($sponsor, $currentUser)
     {
-        // Ambil semua downline langsung berdasarkan upline_id yang punya premium pin, urutkan berdasarkan created_at
         $allUplines = $sponsor->uplines()
             ->whereHas('premiumUserPin')
             ->orderBy('created_at', 'asc')
             ->get();
-        
+
         if ($allUplines->count() < 2) {
-            // Sponsor harus punya minimal 2 downline langsung untuk memiliki jalur monoleg
             return null;
         }
-        
-        // Downline pertama = Leg Kiri (tidak dihitung sebagai monoleg, tidak dapat bonus)
-        // Downline kedua dan seterusnya = jalur monoleg (Leg 1, Leg 2, dst) - dapat bonus
-        $monolegUplines = $allUplines->skip(1)->values();
-        
-        // Cek apakah current user adalah downline langsung dari sponsor di jalur monoleg
-        // Bonus monoleg hanya untuk downline langsung dari sponsor, bukan downline dari downline
-        foreach ($monolegUplines as $monolegUpline) {
-            // Jika current user langsung di bawah sponsor di jalur monoleg (upline_id = sponsor->id), return sponsor
-            // Catatan: monolegUpline adalah downline langsung dari sponsor di jalur monoleg
-            // Jadi kita cek apakah currentUser adalah monolegUpline itu sendiri (downline langsung dari sponsor)
-            if ($currentUser->id == $monolegUpline->id) {
+
+        $monolegLegs = $allUplines->skip(1)->values();
+
+        foreach ($monolegLegs as $leg) {
+            if ($currentUser->id == $leg->id) {
+                return $sponsor;
+            }
+            if (Helper::isUserUnderLeg($currentUser, $leg, $sponsor)) {
                 return $sponsor;
             }
         }
-        
+
         return null;
     }
 
     /**
-     * Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst)
-     * Bonus monoleg diberikan ke semua upline di jalur monoleg yang memenuhi syarat
-     * 
+     * Hitung bonus monoleg secara recursive untuk semua level (level 1, 2, 3, dst).
+     * Jalur bonus = persis seperti tree monoleg: level 1 dari joiner, level 2 dari member pertama
+     * di bawah Leg 1, level 3 dari member pertama di bawah Leg itu, dst.
+     * Source bonus untuk level > 1 = member pertama langsung di bawah Leg (bukan member ke-2 yang join).
+     *
      * @param User $sponsor Sponsor dari user yang melakukan upgrade/RO
      * @param User $currentUser User yang melakukan upgrade/RO
      * @param int $basePrice Harga dasar untuk perhitungan bonus (price untuk join/upgrade, ro_price untuk RO)
      * @param float $monolegPercent Persentase bonus monoleg (biasanya 9%)
-     * @param string $descriptionTemplate Template deskripsi bonus (akan ditambahkan level)
+     * @param string $descriptionTemplate Template deskripsi. Gunakan %s untuk nama member. Jika tidak ada %s (e.g. "RO Automaintain") dipakai apa adanya.
+     * @param \DateTimeInterface|null $occurredAt Jika diisi, created_at/updated_at bonus mengikuti waktu ini (e.g. waktu penggunaan UserPin).
      */
-    public static function calculateMonolegBonusRecursive($sponsor, $currentUser, $basePrice, $monolegPercent, $descriptionTemplate)
+    public static function calculateMonolegBonusRecursive($sponsor, $currentUser, $basePrice, $monolegPercent, $descriptionTemplate, $occurredAt = null)
     {
         if (!$sponsor || !$currentUser) {
             return;
@@ -715,6 +758,7 @@ trait Helper
         $level = 1;
         $currentSponsor = $sponsor;
         $currentUserForMonoleg = $currentUser;
+        $baseOccurredAt = $occurredAt ? \Carbon\Carbon::instance($occurredAt) : null;
         
         // Loop untuk mencari semua monoleg di jalur ke atas (level 1, 2, 3, dst)
         while ($currentSponsor) {
@@ -728,41 +772,52 @@ trait Helper
                     $amount = round($basePrice * $monolegPercent / 100);
                     
                     if ($amount > 0) {
-                        // Buat deskripsi dengan level
-                        $description = $descriptionTemplate;
-                        if ($level > 1) {
-                            $description .= ' (Level ' . $level . ')';
-                        }
+                        // Deskripsi: selalu siapa yang register (joiner); level = kedalaman dari penerima ke joiner di tree
+                        $description = strpos($descriptionTemplate, '%s') !== false
+                            ? sprintf($descriptionTemplate, $currentUser->username)
+                            : $descriptionTemplate;
+                        $depthLevel = Helper::monolegDepthFromRecipientToJoiner($monoleg, $currentUser);
+                        $description .= ' (Level ' . $depthLevel . ')';
                         
-                        // Buat bonus
-                        $bonus = $monoleg->bonuses()->create([
+                        // Timestamp ikut UserPin joiner (waktu pendaftaran/pakai pin)
+                        $bonusData = [
                             'type' => 'Komisi Monoleg',
                             'amount' => $amount,
                             'description' => $description,
-                        ]);
+                        ];
+                        if ($baseOccurredAt) {
+                            $bonusData['created_at'] = $baseOccurredAt;
+                            $bonusData['updated_at'] = $baseOccurredAt;
+                        }
+                        $bonus = $monoleg->bonuses()->create($bonusData);
                         
                         Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
                     }
                     
-                    // Lanjutkan ke level berikutnya
-                    // Untuk level berikutnya, kita perlu mencari monoleg dari monoleg yang baru saja mendapat bonus
-                    // Current user untuk level berikutnya adalah monoleg yang baru saja mendapat bonus
-                    // Current sponsor untuk level berikutnya adalah sponsor dari monoleg tersebut
-                    // Catatan: Untuk level 2+, kita mencari monoleg dari monoleg level sebelumnya
-                    $currentUserForMonoleg = $monoleg;
-                    $currentSponsor = $monoleg->sponsor;
+                    // Level > 1: hanya jalur pertama (member pertama di bawah Leg) yang dapat bonus ke atas
+                    // Jika joiner bukan di jalur pertama (bukan A1 / bukan di bawah A1), stop — tidak beri bonus level 2+
+                    $firstDirect = Helper::getFirstDirectDownlineWithPremium($monoleg);
+                    if ($firstDirect && $level >= 1) {
+                        $joinerInFirstPath = ($currentUser->id === $firstDirect->id)
+                            || Helper::isUserUnderLeg($currentUser, $firstDirect, $monoleg);
+                        if (!$joinerInFirstPath) {
+                            break;
+                        }
+                    }
+                    $currentUserForMonoleg = $firstDirect ?? $monoleg;
+                    $currentSponsor = $monoleg->upline;
                     $level++;
                 } else {
-                    // Tidak ada monoleg lagi, stop
-                    break;
+                    // Upline saat ini punya <2 downline (joiner bisa satu-satunya); naik ke upline dan coba lagi
+                    $currentSponsor = $currentSponsor->upline;
                 }
             } else {
-                // Sponsor tidak memenuhi syarat, stop
+                // Tidak ada upline lagi, stop
                 break;
             }
             
-            // Safety check: maksimal 10 level untuk mencegah infinite loop
-            if ($level > 10) {
+            // Kedalaman unlimited; batas 100 hanya untuk mencegah infinite loop jika data error
+            if ($level > 100) {
                 break;
             }
         }

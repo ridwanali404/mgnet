@@ -122,10 +122,9 @@ class UserController extends Controller
             ]);
         }
         Helper::upgrade($userPin);
-    if ($r['is_clone'] == 'no') {
-        // send email
-        Mail::to($createdUser->email)->send(new WelcomeEmail($createdUser, $password));
-    }
+        if ($r['is_clone'] == 'no' && !app()->environment('local')) {
+            Mail::to($createdUser->email)->send(new WelcomeEmail($createdUser, $password));
+        }
         Session::flash('success', 'Registrasi berhasil');
         return redirect('referral');
     }
@@ -200,9 +199,9 @@ class UserController extends Controller
 
             Auth::loginUsingId($user->id);
 
-            // send email
+            // send email (disabled di local agar tidak perlu koneksi mail server)
             $address = \App\Models\Address::find($request->address_id);
-            if (env('MAIL_USERNAME')) {
+            if (!app()->environment('local') && env('MAIL_USERNAME')) {
                 Mail::to($user->email)->send(new WelcomeEmail($user, $request->password));
             }
 

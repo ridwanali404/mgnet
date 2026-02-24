@@ -163,7 +163,7 @@ class TransactionController extends Controller
                 'address' => $address,
                 'transaction' => $transaction,
             );
-            if (env('MAIL_USERNAME')) {
+            if (!app()->environment('local') && env('MAIL_USERNAME')) {
                 Mail::send('mail.transaction', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)->subject('Transaksi');
                     $message->from('cs.ptbisnissuksesmulia@gmail.com','MG Network');
@@ -179,7 +179,7 @@ class TransactionController extends Controller
             );
             $to_name = $user->name;
             $to_email = $user->email;
-            if (env('MAIL_USERNAME')) {
+            if (!app()->environment('local') && env('MAIL_USERNAME')) {
                 Mail::send('mail.transaction', $data, function($message) use ($to_name, $to_email) {
                     $message->to($to_email, $to_name)->subject('Transaksi');
                     $message->from('cs.ptbisnissuksesmulia@gmail.com','MG Network');

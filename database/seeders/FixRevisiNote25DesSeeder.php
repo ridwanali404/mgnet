@@ -153,8 +153,8 @@ class FixRevisiNote25DesSeeder extends Seeder
                 continue;
             }
             
-            $sponsor = $user->sponsor;
-            if (!$sponsor || $sponsor->uplines()->whereHas('premiumUserPin')->count() < 1) {
+            $firstUpline = $user->upline ?? $user->sponsor;
+            if (!$firstUpline || $firstUpline->uplines()->whereHas('premiumUserPin')->count() < 1) {
                 $skipped++;
                 continue;
             }
@@ -169,13 +169,13 @@ class FixRevisiNote25DesSeeder extends Seeder
                 }
                 $basePrice = $goldPin->ro_price ?? 1700000;
                 $monolegPercent = $goldPin->monoleg_percent ?? 9;
-                $descriptionTemplate = 'Komisi Monoleg dari RO Automaintain oleh ' . $user->username . '.';
+                $descriptionTemplate = 'Komisi Monoleg dari RO Automaintain oleh %s.';
             } else {
-                // Untuk join/upgrade normal
+                // Untuk join/upgrade normal (level > 1 pakai member pertama langsung)
                 $basePrice = $pin->price;
                 $monolegPercent = $pin->monoleg_percent;
                 $action = $pin->type == 'upgrade' ? 'upgrade' : 'join';
-                $descriptionTemplate = 'Bonus Monoleg 9% dari ' . $action . ' ' . $user->username . ' paket ' . $pin->name . '.';
+                $descriptionTemplate = 'Bonus Monoleg 9%% dari ' . $action . ' %s paket ' . $pin->name . '.';
             }
             
             // Cek bonus monoleg yang sudah ada untuk user pin ini
@@ -202,13 +202,14 @@ class FixRevisiNote25DesSeeder extends Seeder
             // Untuk sekarang, kita akan recalculate semua level dan skip yang sudah ada
             // Ini lebih aman untuk memastikan tidak ada yang terlewat
             
-            // Recalculate bonus monoleg untuk semua level
+            // Recalculate bonus monoleg untuk semua level (jalur ikut upline)
             $level = 1;
-            $currentSponsor = $sponsor;
+            $currentSponsor = $firstUpline;
             $currentUserForMonoleg = $user;
+            $descriptionUser = $user;
             $newBonusesAdded = 0;
             
-            while ($currentSponsor && $level <= 10) {
+            while ($currentSponsor && $level <= 100) {
                 if ($currentSponsor->uplines()->whereHas('premiumUserPin')->count() >= 1) {
                     $monoleg = Helper::findMonolegRecursive($currentSponsor, $currentUserForMonoleg);
                     
@@ -216,11 +217,13 @@ class FixRevisiNote25DesSeeder extends Seeder
                         $amount = round($basePrice * $monolegPercent / 100);
                         
                         if ($amount > 0) {
-                            $description = $descriptionTemplate;
-                            if ($level > 1) {
-                                $description .= ' (Level ' . $level . ')';
-                            }
-                            
+                            // Deskripsi selalu joiner; level = kedalaman dari penerima ke joiner di tree
+                            $description = strpos($descriptionTemplate, '%s') !== false
+                                ? sprintf($descriptionTemplate, $user->username)
+                                : $descriptionTemplate;
+                            $depthLevel = Helper::monolegDepthFromRecipientToJoiner($monoleg, $user);
+                            $description .= ' (Level ' . $depthLevel . ')';
+                            $pinOccurredAt = $userPin->updated_at ?? $userPin->created_at;
                             // Cek apakah bonus ini sudah ada
                             $bonusExists = Bonus::where('type', 'Komisi Monoleg')
                                 ->where('user_id', $monoleg->id)
@@ -230,13 +233,12 @@ class FixRevisiNote25DesSeeder extends Seeder
                                 ->exists();
                             
                             if (!$bonusExists) {
-                                // Buat bonus baru
                                 $bonus = $monoleg->bonuses()->create([
                                     'type' => 'Komisi Monoleg',
                                     'amount' => $amount,
                                     'description' => $description,
-                                    'created_at' => $userPin->created_at,
-                                    'updated_at' => $userPin->created_at,
+                                    'created_at' => $pinOccurredAt,
+                                    'updated_at' => $pinOccurredAt,
                                 ]);
                                 
                                 Helper::automaintain($monoleg, 'K', $bonus->amount, 'Saldo automaintain dari ' . $bonus->description);
@@ -245,8 +247,17 @@ class FixRevisiNote25DesSeeder extends Seeder
                             }
                         }
                         
-                        $currentUserForMonoleg = $monoleg;
-                        $currentSponsor = $monoleg->sponsor;
+                        // Level > 1: hanya jalur pertama (member pertama di bawah Leg) — joiner harus di bawah firstDirect
+                        $firstDirect = Helper::getFirstDirectDownlineWithPremium($monoleg);
+                        if ($firstDirect && $level >= 1) {
+                            $joinerInFirstPath = ($user->id === $firstDirect->id)
+                                || Helper::isUserUnderLeg($user, $firstDirect, $monoleg);
+                            if (!$joinerInFirstPath) {
+                                break;
+                            }
+                        }
+                        $currentUserForMonoleg = $firstDirect ?? $monoleg;
+                        $currentSponsor = $monoleg->upline;
                         $level++;
                     } else {
                         break;
