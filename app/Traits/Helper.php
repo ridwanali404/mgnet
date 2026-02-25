@@ -219,15 +219,17 @@ trait Helper
             ]);
         }
 
-        // pp pr update
-        $sponsor = $user->sponsor;
+        // pp pr update: gunakan jalur TREE UPLINE (bukan sponsor) agar Poin Power Plus
+        // mengikuti penempatan (placement). Jika ada penempatan di bawah jaringan kita
+        // tapi sponsor langsung adalah orang lain, poin tetap naik ke upline kita ke atas.
+        $upline = $user->upline;
         if ($pin->poin_pair || $pin->poin_reward || $pin->poin_ro) {
-            while ($sponsor) {
-                $dailyPoin = $sponsor->dailyPoins()->firstOrCreate(['date' => date('Y-m-d')]);
+            while ($upline) {
+                $dailyPoin = $upline->dailyPoins()->firstOrCreate(['date' => date('Y-m-d')]);
                 $dailyPoin->increment('pp', $pin->poin_pair);
                 $pr = $pin->poin_reward;
                 $dailyPoin->increment('pr', $pr);
-                $sponsor = $sponsor->sponsor;
+                $upline = $upline->upline;
             }
         }
     }
