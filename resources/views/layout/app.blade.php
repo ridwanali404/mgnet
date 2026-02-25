@@ -325,6 +325,10 @@
                                 <a href="{{ url('pin') }}" aria-expanded="false"><i
                                         class="mdi mdi-cards-outline"></i><span class="hide-menu">Pin</span></a>
                             </li>
+                            <li class="{{ request()->segment(1) == 'generasi-bonus' ? 'active' : '' }}">
+                                <a href="{{ route('generasi-bonus.index') }}" aria-expanded="false"><i
+                                        class="mdi mdi-cash-multiple"></i><span class="hide-menu">Bonus Generasi</span></a>
+                            </li>
                             <li class="{{ Route::is('award.index') ? 'active' : '' }}">
                                 <a href="{{ route('award.index') }}" aria-expanded="false"><i
                                         class="mdi mdi-trophy"></i><span class="hide-menu">Reward</span></a>

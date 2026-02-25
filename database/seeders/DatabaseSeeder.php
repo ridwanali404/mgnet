@@ -40,6 +40,9 @@ class DatabaseSeeder extends Seeder
         \App\Models\AboutUs::truncate();
         \App\Models\ContactUs::truncate();
 
+        if (\Illuminate\Support\Facades\Schema::hasTable('generasi_bonus_amounts')) {
+            \App\Models\GenerasiBonusAmount::truncate();
+        }
         Pin::truncate();
         Product::truncate();
         User::truncate();
@@ -356,6 +359,8 @@ class DatabaseSeeder extends Seeder
             'facebook' => 'https://www.facebook.com/groups/1233197023410185',
             'youtube' => 'https://www.youtube.com/channel/UCcTn-e0bRT1l7lns_ItfRMQ'
         ));
+
+        $this->call(\Database\Seeders\GenerasiBonusAmountSeeder::class);
     }
 
     public function uploadImage($image_path, $width, $height, $path_save)

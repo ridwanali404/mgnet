@@ -211,6 +211,9 @@ Route::group(['middleware' => ['auth']], function () {
         Route::delete('admin/{user}', 'UserController@adminDestroy')->name('admin.destroy');
         Route::view('config/daily', 'config.daily')->name('config.daily');
         Route::view('config/monthly', 'config.monthly')->name('config.monthly');
+        Route::get('generasi-bonus', 'GenerasiBonusController@index')->name('generasi-bonus.index');
+        Route::get('generasi-bonus/{pin}/edit', 'GenerasiBonusController@edit')->name('generasi-bonus.edit');
+        Route::put('generasi-bonus/{pin}', 'GenerasiBonusController@update')->name('generasi-bonus.update');
         Route::resource('userPoin', 'UserPoinController');
         Route::get('poin/enable', 'PoinController@enable')->name('poin.enable');
         Route::get('poin/disable', 'PoinController@disable')->name('poin.disable');

@@ -9,6 +9,11 @@ class Pin extends Model
     protected $guarded = [];
     protected $appends = ['name_short'];
 
+    public function generasiBonusAmounts()
+    {
+        return $this->hasMany(GenerasiBonusAmount::class);
+    }
+
     public function getNameShortAttribute()
     {
         if (!str_contains($this->name, 'Upgrade') && !str_contains($this->name, 'Generasi') && !str_contains($this->name, 'BSM')) {
